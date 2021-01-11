@@ -28,39 +28,18 @@
 #include <libssh/sftp.h>
 #include "logging.h"
 
-#define MAX_FILE_HANDLES		10
-
-struct file_handle_t {
-	bool allocated;
-	int fd;
-	bool eof;
-};
-
 struct ssh_handle_t {
 	unsigned int hid;
 	ssh_event event;
 	ssh_session session;
 	ssh_channel channel;
 	sftp_session sftp;
-	unsigned int auth_attempts;
-	bool authenticated;
-	unsigned int authentication_attempts;
-	bool sftp_requested;
-	struct file_handle_t file_handles[MAX_FILE_HANDLES];
+	struct {
+		bool authenticated;
+		bool sftp_requested;
+		unsigned int authentication_attempts;
+	} params;
 };
-
-static struct file_handle_t *get_free_file_handle(struct ssh_handle_t *handle) {
-	for (unsigned int i = 0; i < MAX_FILE_HANDLES; i++) {
-		if (!handle->file_handles[i].allocated) {
-			return &handle->file_handles[i];
-		}
-	}
-	return NULL;
-}
-
-static void release_file_handle(struct file_handle_t *file_handle) {
-	memset(file_handle, 0, sizeof(*file_handle));
-}
 
 static int subsystem_request(ssh_session session, ssh_channel channel, const char *subsystem, void *userdata) {
 	struct ssh_handle_t *handle = (struct ssh_handle_t*) userdata;
@@ -68,7 +47,7 @@ static int subsystem_request(ssh_session session, ssh_channel channel, const cha
 
 	logmsg(LLVL_TRACE, "HID %u - subsystem requested: %s", handle->hid, subsystem);
 	if (!strcmp(subsystem, "sftp")) {
-		handle->sftp_requested = true;
+		handle->params.sftp_requested = true;
 		return SSH_OK;
 	} else {
 		return SSH_ERROR;
@@ -78,8 +57,8 @@ static int subsystem_request(ssh_session session, ssh_channel channel, const cha
 static int auth_password(ssh_session session, const char *user, const char *pass, void *userdata) {
 	struct ssh_handle_t *handle = (struct ssh_handle_t*) userdata;
 
-	handle->authenticated = true;
-	handle->authentication_attempts++;
+	handle->params.authenticated = true;
+	handle->params.authentication_attempts++;
 	logmsg(LLVL_TRACE, "HID %u - authentication for user %s successful", handle->hid, user);
 	return SSH_AUTH_SUCCESS;
 }
@@ -97,46 +76,6 @@ static ssh_channel channel_open(ssh_session session, void *userdata) {
 	return handle->channel;
 }
 
-#if 0
-static int exec_request(ssh_session session, ssh_channel channel, const char *command, void *userdata) {
-
-	printf("EXEC\n");
-	return SSH_ERROR;
-}
-
-static int data_function(ssh_session session, ssh_channel channel, void *vdata, uint32_t len, int is_stderr, void *userdata) {
-	struct ssh_handle_t *handle = (struct ssh_handle_t*)userdata;
-
-	printf("[%u] Data: %d bytes\n", handle->hid, len);
-	const uint8_t *data = (const uint8_t*)vdata;
-	for (unsigned int i = 0; i < len; i++) {
-		printf("%02x ", data[i]);
-	}
-	printf("\n");
-
-
-	return len;
-	//   return write(cdata->child_stdin, (char *) data, len);
-}
-#endif
-
-#if 0
-static int pty_request(ssh_session session, ssh_channel channel, const char *term, int cols, int rows, int py, int px, void *userdata) {
-	printf("pty_req\n");
-	return SSH_ERROR;
-}
-
-static int pty_resize(ssh_session session, ssh_channel channel, int cols, int rows, int py, int px, void *userdata) {
-	printf("pty_res\n");
-	return SSH_ERROR;
-}
-
-static int shell_request(ssh_session session, ssh_channel channel, void *userdata) {
-	logmsg(LLVL_ERROR, "HID %u - erroneous shell_request", handle);
-	return SSH_ERROR;
-}
-#endif
-
 static void process_client_message(struct ssh_handle_t *handle, sftp_client_message message) {
 	switch (message->type) {
 		case SSH_FXP_REALPATH: {
@@ -147,6 +86,7 @@ static void process_client_message(struct ssh_handle_t *handle, sftp_client_mess
 
 		case SSH_FXP_OPENDIR: {
 			logmsg(LLVL_TRACE, "HID %u - client requested SSH_FXP_OPENDIR of %s", handle->hid, message->filename);
+#if 0
 			struct file_handle_t *file_handle = get_free_file_handle(handle);
 			if (file_handle) {
 				file_handle->allocated = true;
@@ -156,16 +96,14 @@ static void process_client_message(struct ssh_handle_t *handle, sftp_client_mess
 			} else {
 				logmsg(LLVL_ERROR, "HID %u - out of file handles", handle->hid);
 			}
+#endif
 			return;
 		}
 
 		case SSH_FXP_READDIR: {
+#if 0
 			struct file_handle_t *file_handle = (struct file_handle_t*)sftp_handle(message->sftp, message->handle);
 			logmsg(LLVL_TRACE, "HID %u - client requested SSH_FXP_READDIR of %p", handle->hid, file_handle);
-//			ssh_string dir_handle = sftp_handle_alloc(handle->sftp, handle);
-//			sftp_reply_handle(message, dir_handle);
-//
-//
 
 			if (!file_handle->eof) {
 				sftp_reply_names_add(message, "file", "longname", NULL);
@@ -174,13 +112,14 @@ static void process_client_message(struct ssh_handle_t *handle, sftp_client_mess
 			} else {
 				sftp_reply_status(message, SSH_FX_EOF, "EOF");
 			}
+#endif
 			return;
 		}
 
 		case SSH_FXP_CLOSE: {
 			struct file_handle_t *file_handle = (struct file_handle_t*)sftp_handle(message->sftp, message->handle);
 			logmsg(LLVL_TRACE, "HID %u - client requested SSH_FXP_CLOSE of %p", handle->hid, file_handle);
-			release_file_handle(file_handle);
+			//release_file_handle(file_handle);
 			sftp_reply_status(message, SSH_FX_OK, "OK");
 			return;
 		}
@@ -218,7 +157,7 @@ static void handle_session_event_loop(struct ssh_handle_t *handle) {
 			ssh_channel_close(handle->channel);
 		}
 
-		if (handle->sftp_requested && (handle->sftp == NULL) && (handle->session != NULL) && (handle->channel != NULL)) {
+		if (handle->params.sftp_requested && (handle->sftp == NULL) && (handle->session != NULL) && (handle->channel != NULL)) {
 			handle->sftp = sftp_server_new(handle->session, handle->channel);
 			logmsg(LLVL_TRACE, "HID %u - creating new SFTP server session", handle->hid);
 			if (!handle->sftp) {
@@ -259,13 +198,6 @@ static void handle_session(struct ssh_handle_t *handle) {
 
 	struct ssh_channel_callbacks_struct channel_cb = {
 		.userdata = handle,
-
-//		.channel_pty_request_function = pty_request,
-//		.channel_pty_window_change_function = pty_resize,
-//		.channel_shell_request_function = shell_request,
-
-//		.channel_exec_request_function = exec_request,
-//		.channel_data_function = data_function,
 		.channel_subsystem_request_function = subsystem_request
 	};
 
@@ -287,7 +219,7 @@ static void handle_session(struct ssh_handle_t *handle) {
 	}
 	ssh_event_add_session(handle->event, handle->session);
 
-	while ((!handle->authenticated) || (handle->channel == NULL)) {
+	while ((!handle->params.authenticated) || (handle->channel == NULL)) {
 		logmsg(LLVL_TRACE, "HID %u - polling for authentication events", handle->hid);
 		if (ssh_event_dopoll(handle->event, 100) == SSH_ERROR) {
 			fprintf(stderr, "Polling error: %s\n", ssh_get_error(handle->session));
