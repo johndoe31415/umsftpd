@@ -61,8 +61,8 @@ static void vfs_dump_inode_target(FILE *f, const struct vfs_inode_t *inode) {
 
 void vfs_dump(FILE *f, const struct vfs_t *vfs) {
 	fprintf(f, "VFS details:\n");
-	if (vfs->last_error) {
-		fprintf(f, "   Last error: %d (%s)\n", vfs->last_error, vfs->error_str);
+	if (vfs->error.code) {
+		fprintf(f, "   Last error: %d (%s)\n", vfs->error.code, vfs->error.string);
 	}
 	fprintf(f, "   Max handles: %d, Mappings: %d\n", vfs->max_handle_count, vfs->inode_count);
 	fprintf(f, "   Base flags: 0x%x ", vfs->base_flags);
@@ -76,7 +76,7 @@ void vfs_dump(FILE *f, const struct vfs_t *vfs) {
 	}
 }
 
-void vfs_dump_map_result(FILE *f, const struct vfs_map_result_t *map_result) {
+void vfs_dump_map_result(FILE *f, const struct vfs_lookup_result_t *map_result) {
 	fprintf(f, "Map result flags: 0x%x ", map_result->flags);
 	vfs_dump_flags(f, map_result->flags);
 	fprintf(f, "\n");

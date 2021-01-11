@@ -31,17 +31,17 @@
 #include "logging.h"
 #include "strings.h"
 
-struct vfs_map_traversal_t {
+struct vfs_lookup_traversal_t {
 	struct vfs_t *vfs;
-	struct vfs_map_result_t *map_result;
+	struct vfs_lookup_result_t *map_result;
 };
 
 static void vfs_set_error(struct vfs_t *vfs, enum vfs_error_code_t error_code, const char *msg, ...) {
-	vfs->last_error = error_code;
+	vfs->error.code = error_code;
 
 	va_list ap;
 	va_start(ap, msg);
-	vsnprintf(vfs->error_str, VFS_MAX_ERROR_LENGTH - 1, msg, ap);
+	vsnprintf(vfs->error.string, VFS_MAX_ERROR_LENGTH - 1, msg, ap);
 	va_end(ap);
 }
 
@@ -132,8 +132,8 @@ bool vfs_add_inode(struct vfs_t *vfs, const char *virtual_path, const char *targ
 	return true;
 }
 
-static bool vfs_map_splitter(const char *path, void *vctx) {
-	struct vfs_map_traversal_t *ctx = (struct vfs_map_traversal_t*)vctx;
+static bool vfs_lookup_splitter(const char *path, void *vctx) {
+	struct vfs_lookup_traversal_t *ctx = (struct vfs_lookup_traversal_t*)vctx;
 	struct vfs_inode_t *inode = vfs_find_inode(ctx->vfs, path);
 	if (inode) {
 		if (inode->flags & VFS_INODE_FLAG_RESET) {
@@ -149,7 +149,7 @@ static bool vfs_map_splitter(const char *path, void *vctx) {
 	return true;
 }
 
-bool vfs_map(struct vfs_t *vfs, struct vfs_map_result_t *result, const char *path) {
+bool vfs_lookup(struct vfs_t *vfs, struct vfs_lookup_result_t *result, const char *path) {
 	if (!vfs->inodes_finalized) {
 		vfs_set_error(vfs, VFS_INODE_FINALIZATION_ERROR, "inodes not finalized");
 		return false;
@@ -175,11 +175,11 @@ bool vfs_map(struct vfs_t *vfs, struct vfs_map_result_t *result, const char *pat
 	memset(result, 0, sizeof(*result));
 	result->flags = vfs->base_flags;
 
-	struct vfs_map_traversal_t ctx = {
+	struct vfs_lookup_traversal_t ctx = {
 		.vfs = vfs,
 		.map_result = result,
 	};
-	path_split(mpath, vfs_map_splitter, &ctx);
+	path_split(mpath, vfs_lookup_splitter, &ctx);
 	return true;
 }
 
@@ -271,11 +271,11 @@ int main(void) {
 	vfs_finalize_inodes(vfs);
 	vfs_dump(stderr, vfs);
 
-	struct vfs_map_result_t result;
-	//vfs_map(vfs, &result, "/pics/DCIM/12345.jpg");
-//	vfs_map(vfs, &result, "/pics/foo/bar");
-//	vfs_map(vfs, &result, "/pics/foo/neu/bar");
-	//vfs_map(vfs, &result, "/");
+	struct vfs_lookup_result_t result;
+	//vfs_lookup(vfs, &result, "/pics/DCIM/12345.jpg");
+//	vfs_lookup(vfs, &result, "/pics/foo/bar");
+//	vfs_lookup(vfs, &result, "/pics/foo/neu/bar");
+	//vfs_lookup(vfs, &result, "/");
 
 	vfs_dump_map_result(stderr, &result);
 

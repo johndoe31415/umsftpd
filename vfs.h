@@ -39,13 +39,14 @@
 #define VFS_INODE_FLAG_DISALLOW_UNLINK			(1 << 6)
 
 struct vfs_inode_t {
+	struct vfs_inode_t *parent;
 	unsigned int flags;
 	char *virtual_path;
 	char *target_path;
 	size_t vlen, tlen;
 };
 
-struct vfs_map_result_t {
+struct vfs_lookup_result_t {
 	unsigned int flags;
 	struct vfs_inode_t *mountpoint;
 	struct vfs_inode_t *target;
@@ -71,8 +72,10 @@ enum vfs_error_code_t {
 };
 
 struct vfs_t {
-	char error_str[VFS_MAX_ERROR_LENGTH];
-	enum vfs_error_code_t last_error;
+	struct {
+		char string[VFS_MAX_ERROR_LENGTH];
+		enum vfs_error_code_t code;
+	} error;
 	unsigned int max_handle_count;
 	unsigned int inode_count;
 	unsigned int base_flags;
@@ -84,15 +87,13 @@ struct vfs_t {
 };
 
 /*************** AUTO GENERATED SECTION FOLLOWS ***************/
-bool vfs_add_inode(struct vfs_t *vfs, const char *virtual_path, const char *real_path, unsigned int flags);
-bool vfs_map(struct vfs_t *vfs, struct vfs_map_result_t *result, const char *path);
+bool vfs_add_inode(struct vfs_t *vfs, const char *virtual_path, const char *target_path, unsigned int flags);
+bool vfs_lookup(struct vfs_t *vfs, struct vfs_lookup_result_t *result, const char *path);
 void vfs_finalize_inodes(struct vfs_t *vfs);
 struct vfs_handle_t* vfs_opendir(const struct vfs_t *vfs, const char *virtual_path);
 struct vfs_t *vfs_init(void);
 void vfs_handle_free(struct vfs_handle_t *handle);
 void vfs_free(struct vfs_t *vfs);
-void vfs_dump(FILE *f, const struct vfs_t *vfs);
-void vfs_dump_map_result(FILE *f, const struct vfs_map_result_t *map_result);
 /***************  AUTO GENERATED SECTION ENDS   ***************/
 
 #endif

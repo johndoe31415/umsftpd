@@ -29,7 +29,7 @@
 
 /*************** AUTO GENERATED SECTION FOLLOWS ***************/
 void vfs_dump(FILE *f, const struct vfs_t *vfs);
-void vfs_dump_map_result(FILE *f, const struct vfs_map_result_t *map_result);
+void vfs_dump_map_result(FILE *f, const struct vfs_lookup_result_t *map_result);
 /***************  AUTO GENERATED SECTION ENDS   ***************/
 
 #endif
