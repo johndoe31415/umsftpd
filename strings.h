@@ -26,10 +26,10 @@
 
 #include <stdbool.h>
 
-typedef bool (*path_split_callback_t)(const char *path, void *vctx);
+typedef bool (*path_split_callback_t)(const char *path, bool is_full_path, void *vctx);
 
 /*************** AUTO GENERATED SECTION FOLLOWS ***************/
-void path_split(char *path, path_split_callback_t callback, void *vctx);
+void path_split(const char *path, path_split_callback_t callback, void *vctx);
 bool is_directory_string(const char *path);
 /***************  AUTO GENERATED SECTION ENDS   ***************/
 

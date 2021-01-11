@@ -82,8 +82,8 @@ struct vfs_t {
 	struct {
 		unsigned int base_flags;
 		unsigned int count;
-		struct vfs_inode_t *data;
-		bool finalized;
+		struct vfs_inode_t **data;
+		bool frozen;
 	} inode;
 	struct {
 		unsigned int alloced_size;
@@ -95,7 +95,7 @@ struct vfs_t {
 /*************** AUTO GENERATED SECTION FOLLOWS ***************/
 bool vfs_add_inode(struct vfs_t *vfs, const char *virtual_path, const char *target_path, unsigned int flags);
 bool vfs_lookup(struct vfs_t *vfs, struct vfs_lookup_result_t *result, const char *path);
-void vfs_finalize_inodes(struct vfs_t *vfs);
+void vfs_freeze_inodes(struct vfs_t *vfs);
 struct vfs_handle_t* vfs_opendir(const struct vfs_t *vfs, const char *virtual_path);
 struct vfs_t *vfs_init(void);
 void vfs_handle_free(struct vfs_handle_t *handle);

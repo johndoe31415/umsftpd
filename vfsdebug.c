@@ -64,13 +64,13 @@ void vfs_dump(FILE *f, const struct vfs_t *vfs) {
 	if (vfs->error.code) {
 		fprintf(f, "   Last error: %d (%s)\n", vfs->error.code, vfs->error.string);
 	}
-	fprintf(f, "   Max handles: %d, Mappings: %d\n", vfs->max_handle_count, vfs->inode_count);
-	fprintf(f, "   Base flags: 0x%x ", vfs->base_flags);
-	vfs_dump_flags(f, vfs->base_flags);
+	fprintf(f, "   Max handles: %d, Mappings: %d\n", vfs->handles.max_count, vfs->inode.count);
+	fprintf(f, "   Base flags: 0x%x ", vfs->inode.base_flags);
+	vfs_dump_flags(f, vfs->inode.base_flags);
 	fprintf(f, "\n");
-	for (unsigned int i = 0; i < vfs->inode_count; i++) {
-		struct vfs_inode_t *inode = &vfs->inodes[i];
-		fprintf(f, "   Mapping %2d of %d: ", i + 1, vfs->inode_count);
+	for (unsigned int i = 0; i < vfs->inode.count; i++) {
+		struct vfs_inode_t *inode = vfs->inode.data[i];
+		fprintf(f, "   Mapping %2d of %d: ", i + 1, vfs->inode.count);
 		vfs_dump_inode_target(f, inode);
 		fprintf(f, "\n");
 	}

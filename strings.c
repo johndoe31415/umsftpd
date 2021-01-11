@@ -24,14 +24,18 @@
 #include <string.h>
 #include "strings.h"
 
-void path_split(char *path, path_split_callback_t callback, void *vctx) {
+void path_split(const char *path, path_split_callback_t callback, void *vctx) {
 	size_t len = strlen(path);
+	char copy[len + 1];
+	strcpy(copy, path);
+
 	for (size_t i = 0; i < len; i++) {
-		if (path[i] == '/') {
-			char saved = path[i + 1];
-			path[i + 1] = 0;
-			bool continue_splitting = callback(path, vctx);
-			path[i + 1] = saved;
+		if (copy[i] == '/') {
+			char saved = copy[i + 1];
+			copy[i + 1] = 0;
+			bool is_full_path = (i == (len - 1));
+			bool continue_splitting = callback(copy, is_full_path, vctx);
+			copy[i + 1] = saved;
 			if (!continue_splitting) {
 				break;
 			}
