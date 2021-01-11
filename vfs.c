@@ -45,20 +45,20 @@ static void vfs_set_error(struct vfs_t *vfs, enum vfs_error_code_t error_code, c
 	va_end(ap);
 }
 
-static struct vfs_inode_t *vfs_find_mapping(struct vfs_t *vfs, const char *virtual_path) {
+static struct vfs_inode_t *vfs_find_inode(struct vfs_t *vfs, const char *virtual_path) {
 	int vpath_len = strlen(virtual_path);
 
-	for (unsigned int i = 0; i < vfs->mapping_count; i++) {
-		struct vfs_inode_t *mapping = &vfs->mappings[i];
+	for (unsigned int i = 0; i < vfs->inode_count; i++) {
+		struct vfs_inode_t *inode = &vfs->inodes[i];
 
 		/* Search for match with trailing slash */
-		if (!strcmp(mapping->virtual_path, virtual_path)) {
-			return mapping;
+		if (!strcmp(inode->virtual_path, virtual_path)) {
+			return inode;
 		}
 
 		/* But also find it if there is no trailing slash */
-		if ((vpath_len == mapping->vlen - 1) && (!strncmp(mapping->virtual_path, virtual_path, mapping->vlen - 1))) {
-			return mapping;
+		if ((vpath_len == inode->vlen - 1) && (!strncmp(inode->virtual_path, virtual_path, inode->vlen - 1))) {
+			return inode;
 		}
 
 	}
@@ -87,9 +87,9 @@ static bool vfs_set_cwd(struct vfs_t *vfs, const char *new_cwd) {
 	return true;
 }
 
-bool vfs_add_mapping(struct vfs_t *vfs, const char *virtual_path, const char *real_path, unsigned int flags) {
+bool vfs_add_inode(struct vfs_t *vfs, const char *virtual_path, const char *real_path, unsigned int flags) {
 	if (!is_directory_string(virtual_path)) {
-		vfs_set_error(vfs, VFS_ADD_MAPPING_PARAMETER_ERROR, "virtual path must start and end with a '/' character");
+		vfs_set_error(vfs, VFS_ADD_INODE_PARAMETER_ERROR, "virtual path must start and end with a '/' character");
 		return false;
 	}
 
@@ -98,68 +98,68 @@ bool vfs_add_mapping(struct vfs_t *vfs, const char *virtual_path, const char *re
 	if (real_path) {
 		rlen = strlen(real_path);
 		if (!is_directory_string(real_path)) {
-			vfs_set_error(vfs, VFS_ADD_MAPPING_PARAMETER_ERROR, "real path must start and end with a '/' character");
+			vfs_set_error(vfs, VFS_ADD_INODE_PARAMETER_ERROR, "real path must start and end with a '/' character");
 			return false;
 		}
 	}
 
-	if (vfs_find_mapping(vfs, virtual_path)) {
-		vfs_set_error(vfs, VFS_ADD_MAPPING_ALREADY_EXISTS, "virtual path mapping for '%s' is duplicate", virtual_path);
+	if (vfs_find_inode(vfs, virtual_path)) {
+		vfs_set_error(vfs, VFS_ADD_INODE_ALREADY_EXISTS, "virtual path inode for '%s' is duplicate", virtual_path);
 		return false;
 	}
 
 	char *vpath_copy = strdup(virtual_path);
 	if (!vpath_copy) {
-		vfs_set_error(vfs, VFS_ADD_MAPPING_OUT_OF_MEMORY, "error dupping virtual path (%s)", strerror(errno));
+		vfs_set_error(vfs, VFS_ADD_INODE_OUT_OF_MEMORY, "error dupping virtual path (%s)", strerror(errno));
 		return false;
 	}
 
 	char *rpath_copy = real_path ? strdup(real_path) : NULL;
 	if (real_path && (!rpath_copy)) {
 		free(vpath_copy);
-		vfs_set_error(vfs, VFS_ADD_MAPPING_OUT_OF_MEMORY, "error dupping real path (%s)", strerror(errno));
+		vfs_set_error(vfs, VFS_ADD_INODE_OUT_OF_MEMORY, "error dupping real path (%s)", strerror(errno));
 		return false;
 	}
 
-	struct vfs_inode_t *new_mappings = realloc(vfs->mappings, sizeof(struct vfs_inode_t) * (vfs->mapping_count + 1));
-	if (!new_mappings) {
-		vfs_set_error(vfs, VFS_ADD_MAPPING_OUT_OF_MEMORY, "error reallocating mapping memory (%s)", strerror(errno));
+	struct vfs_inode_t *new_inodes = realloc(vfs->inodes, sizeof(struct vfs_inode_t) * (vfs->inode_count + 1));
+	if (!new_inodes) {
+		vfs_set_error(vfs, VFS_ADD_INODE_OUT_OF_MEMORY, "error reallocating inode memory (%s)", strerror(errno));
 		return false;
 	}
-	vfs->mappings = new_mappings;
-	vfs->mapping_count++;
+	vfs->inodes = new_inodes;
+	vfs->inode_count++;
 
-	struct vfs_inode_t *new_mapping = &vfs->mappings[vfs->mapping_count - 1];
-	memset(new_mapping, 0, sizeof(*new_mapping));
-	new_mapping->virtual_path = vpath_copy;
-	new_mapping->flags = flags;
-	new_mapping->target = rpath_copy;
-	new_mapping->vlen = vlen;
-	new_mapping->rlen = rlen;
+	struct vfs_inode_t *new_inode = &vfs->inodes[vfs->inode_count - 1];
+	memset(new_inode, 0, sizeof(*new_inode));
+	new_inode->virtual_path = vpath_copy;
+	new_inode->flags = flags;
+	new_inode->target = rpath_copy;
+	new_inode->vlen = vlen;
+	new_inode->rlen = rlen;
 
 	return true;
 }
 
 static bool vfs_map_splitter(const char *path, void *vctx) {
 	struct vfs_map_traversal_t *ctx = (struct vfs_map_traversal_t*)vctx;
-	struct vfs_inode_t *mapping = vfs_find_mapping(ctx->vfs, path);
-	if (mapping) {
-		if (mapping->flags & VFS_MAPPING_FLAG_RESET) {
-			ctx->map_result->flags = mapping->flags & ~VFS_MAPPING_FLAG_RESET;
+	struct vfs_inode_t *inode = vfs_find_inode(ctx->vfs, path);
+	if (inode) {
+		if (inode->flags & VFS_INODE_FLAG_RESET) {
+			ctx->map_result->flags = inode->flags & ~VFS_INODE_FLAG_RESET;
 		} else {
-			ctx->map_result->flags |= mapping->flags;
+			ctx->map_result->flags |= inode->flags;
 		}
-		ctx->map_result->target = mapping;
-		if (mapping->target) {
-			ctx->map_result->mountpoint = mapping;
+		ctx->map_result->target = inode;
+		if (inode->target) {
+			ctx->map_result->mountpoint = inode;
 		}
 	}
 	return true;
 }
 
 bool vfs_map(struct vfs_t *vfs, struct vfs_map_result_t *result, const char *path) {
-	if (!vfs->mappings_finalized) {
-		vfs_set_error(vfs, VFS_MAPPING_FINALIZATION_ERROR, "mappings not finalized");
+	if (!vfs->inodes_finalized) {
+		vfs_set_error(vfs, VFS_INODE_FINALIZATION_ERROR, "inodes not finalized");
 		return false;
 	}
 
@@ -193,33 +193,33 @@ bool vfs_map(struct vfs_t *vfs, struct vfs_map_result_t *result, const char *pat
 
 static bool vfs_finalization_splitter(const char *path, void *vctx) {
 	struct vfs_t *vfs = (struct vfs_t*)vctx;
-	struct vfs_inode_t *mapping = vfs_find_mapping(vfs, path);
-	if (!mapping) {
-		vfs_add_mapping(vfs, path, NULL, 0);
+	struct vfs_inode_t *inode = vfs_find_inode(vfs, path);
+	if (!inode) {
+		vfs_add_inode(vfs, path, NULL, 0);
 	}
 	return true;
 }
 
-static int vfs_mapping_comparator(const void *velem1, const void *velem2) {
+static int vfs_inode_comparator(const void *velem1, const void *velem2) {
 	const struct vfs_inode_t *elem1 = (const struct vfs_inode_t *)velem1;
 	const struct vfs_inode_t *elem2 = (const struct vfs_inode_t *)velem2;
 	return strcmp(elem1->virtual_path, elem2->virtual_path);
 }
 
-void vfs_finalize_mappings(struct vfs_t *vfs) {
-	if (vfs->mappings_finalized) {
-		vfs_set_error(vfs, VFS_MAPPING_FINALIZATION_ERROR, "mappings already finalized");
+void vfs_finalize_inodes(struct vfs_t *vfs) {
+	if (vfs->inodes_finalized) {
+		vfs_set_error(vfs, VFS_INODE_FINALIZATION_ERROR, "inodes already finalized");
 	}
 
-	unsigned int old_mapping_count = vfs->mapping_count;
-	for (unsigned int i = 0; i < old_mapping_count; i++) {
-		struct vfs_inode_t *mapping = &vfs->mappings[i];
-		char mpath[mapping->vlen + 1];
-		strcpy(mpath, mapping->virtual_path);
+	unsigned int old_inode_count = vfs->inode_count;
+	for (unsigned int i = 0; i < old_inode_count; i++) {
+		struct vfs_inode_t *inode = &vfs->inodes[i];
+		char mpath[inode->vlen + 1];
+		strcpy(mpath, inode->virtual_path);
 		path_split(mpath, vfs_finalization_splitter, vfs);
 	}
-	qsort(vfs->mappings, vfs->mapping_count, sizeof(struct vfs_inode_t), vfs_mapping_comparator);
-	vfs->mappings_finalized = true;
+	qsort(vfs->inodes, vfs->inode_count, sizeof(struct vfs_inode_t), vfs_inode_comparator);
+	vfs->inodes_finalized = true;
 }
 
 struct vfs_handle_t* vfs_opendir(const struct vfs_t *vfs, const char *virtual_path) {
@@ -256,98 +256,27 @@ void vfs_free(struct vfs_t *vfs) {
 		return;
 	}
 	free(vfs->cwd);
-	for (unsigned int i = 0; i < vfs->mapping_count; i++) {
-		free(vfs->mappings[i].target);
-		free(vfs->mappings[i].virtual_path);
+	for (unsigned int i = 0; i < vfs->inode_count; i++) {
+		free(vfs->inodes[i].target);
+		free(vfs->inodes[i].virtual_path);
 	}
-	free(vfs->mappings);
+	free(vfs->inodes);
 	free(vfs);
 }
 
-static void vfs_dump_flags(FILE *f, unsigned int flags) {
-	if (flags & VFS_MAPPING_FLAG_RESET) {
-		fprintf(f, " RESET");
-	}
-	if (flags & VFS_MAPPING_FLAG_READ_ONLY) {
-		fprintf(f, " READ_ONLY");
-	}
-	if (flags & VFS_MAPPING_FLAG_FILTER_ALL) {
-		fprintf(f, " FILTER_ALL");
-	}
-	if (flags & VFS_MAPPING_FLAG_FILTER_HIDDEN) {
-		fprintf(f, " FILTER_HIDDEN");
-	}
-	if (flags & VFS_MAPPING_FLAG_DISALLOW_CREATE_FILE) {
-		fprintf(f, " DISALLOW_CREATE_FILE");
-	}
-	if (flags & VFS_MAPPING_FLAG_DISALLOW_CREATE_DIR) {
-		fprintf(f, " DISALLOW_CREATE_DIR");
-	}
-	if (flags & VFS_MAPPING_FLAG_DISALLOW_UNLINK) {
-		fprintf(f, " DISALLOW_UNLINK");
-	}
-}
-
-static void vfs_dump_mapping_target(FILE *f, const struct vfs_inode_t *mapping) {
-	fprintf(f, "%s", mapping->virtual_path);
-	if (mapping->target) {
-		fprintf(f, " => %s", mapping->target);
-	}
-	if (mapping->flags) {
-		fprintf(f, " [flags: 0x%x ", mapping->flags);
-		vfs_dump_flags(f, mapping->flags);
-		fprintf(f, "]");
-	}
-}
-
-void vfs_dump(FILE *f, const struct vfs_t *vfs) {
-	fprintf(f, "VFS details:\n");
-	if (vfs->last_error) {
-		fprintf(f, "   Last error: %d (%s)\n", vfs->last_error, vfs->error_str);
-	}
-	fprintf(f, "   Max handles: %d, Mappings: %d\n", vfs->max_handle_count, vfs->mapping_count);
-	fprintf(f, "   Base flags: 0x%x ", vfs->base_flags);
-	vfs_dump_flags(f, vfs->base_flags);
-	fprintf(f, "\n");
-	for (unsigned int i = 0; i < vfs->mapping_count; i++) {
-		struct vfs_inode_t *mapping = &vfs->mappings[i];
-		fprintf(f, "   Mapping %2d of %d: ", i + 1, vfs->mapping_count);
-		vfs_dump_mapping_target(f, mapping);
-		fprintf(f, "\n");
-	}
-}
-
-void vfs_dump_map_result(FILE *f, const struct vfs_map_result_t *map_result) {
-	fprintf(f, "Map result flags: 0x%x ", map_result->flags);
-	vfs_dump_flags(f, map_result->flags);
-	fprintf(f, "\n");
-	if (map_result->mountpoint) {
-		fprintf(f, "Mountpoint: ");
-		vfs_dump_mapping_target(f, map_result->mountpoint);
-		fprintf(f, "\n");
-	} else {
-		fprintf(f, "No mountpoint.\n");
-	}
-	if (map_result->target) {
-		fprintf(f, "Target: ");
-		vfs_dump_mapping_target(f, map_result->target);
-		fprintf(f, "\n");
-	} else {
-		fprintf(f, "No target.\n");
-	}
-}
-
 #ifdef __VFS_TEST__
+#include "vfsdebug.h"
+
 int main(void) {
 	struct vfs_t *vfs = vfs_init();
-	vfs_add_mapping(vfs, "/pics/", "/home/joe/pics/", 0);
-	vfs_add_mapping(vfs, "/pics/foo/neu/", "/home/joe/pics_neu/", VFS_MAPPING_FLAG_READ_ONLY);
-	vfs_add_mapping(vfs, "/this/is/", NULL, VFS_MAPPING_FLAG_DISALLOW_CREATE_DIR);
-	vfs_add_mapping(vfs, "/this/is/deeply/nested/", "/home/joe/nested/", VFS_MAPPING_FLAG_READ_ONLY);
-	vfs_add_mapping(vfs, "/zeug/", "/tmp/zeug/", 0);
-	vfs_add_mapping(vfs, "/incoming/", "/tmp/write/", VFS_MAPPING_FLAG_DISALLOW_UNLINK);
+	vfs_add_inode(vfs, "/pics/", "/home/joe/pics/", 0);
+	vfs_add_inode(vfs, "/pics/foo/neu/", "/home/joe/pics_neu/", VFS_INODE_FLAG_READ_ONLY);
+	vfs_add_inode(vfs, "/this/is/", NULL, VFS_INODE_FLAG_DISALLOW_CREATE_DIR);
+	vfs_add_inode(vfs, "/this/is/deeply/nested/", "/home/joe/nested/", VFS_INODE_FLAG_READ_ONLY);
+	vfs_add_inode(vfs, "/zeug/", "/tmp/zeug/", 0);
+	vfs_add_inode(vfs, "/incoming/", "/tmp/write/", VFS_INODE_FLAG_DISALLOW_UNLINK);
 	fprintf(stderr, "=========================\n");
-	vfs_finalize_mappings(vfs);
+	vfs_finalize_inodes(vfs);
 	vfs_dump(stderr, vfs);
 
 	struct vfs_map_result_t result;

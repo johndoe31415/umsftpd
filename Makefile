@@ -22,7 +22,7 @@ all: umsftpd
 umsftpd: $(OBJS)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
-vfstest: vfs.c stringlist.c strings.c
+vfstest: vfs.c stringlist.c strings.c vfsdebug.c
 	$(CC) $(CFLAGS) -D__VFS_TEST__ -o $@ $^ $(LDFLAGS)
 
 clean:

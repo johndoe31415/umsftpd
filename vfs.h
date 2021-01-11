@@ -30,13 +30,13 @@
 
 #define VFS_MAX_ERROR_LENGTH		64
 
-#define VFS_MAPPING_FLAG_RESET					(1 << 0)
-#define VFS_MAPPING_FLAG_READ_ONLY				(1 << 1)
-#define VFS_MAPPING_FLAG_FILTER_ALL				(1 << 2)
-#define VFS_MAPPING_FLAG_FILTER_HIDDEN			(1 << 3)
-#define VFS_MAPPING_FLAG_DISALLOW_CREATE_FILE	(1 << 4)
-#define VFS_MAPPING_FLAG_DISALLOW_CREATE_DIR	(1 << 5)
-#define VFS_MAPPING_FLAG_DISALLOW_UNLINK		(1 << 6)
+#define VFS_INODE_FLAG_RESET					(1 << 0)
+#define VFS_INODE_FLAG_READ_ONLY				(1 << 1)
+#define VFS_INODE_FLAG_FILTER_ALL				(1 << 2)
+#define VFS_INODE_FLAG_FILTER_HIDDEN			(1 << 3)
+#define VFS_INODE_FLAG_DISALLOW_CREATE_FILE	(1 << 4)
+#define VFS_INODE_FLAG_DISALLOW_CREATE_DIR	(1 << 5)
+#define VFS_INODE_FLAG_DISALLOW_UNLINK		(1 << 6)
 
 struct vfs_inode_t {
 	char *virtual_path;
@@ -61,12 +61,12 @@ struct vfs_handle_t {
 };
 
 enum vfs_error_code_t {
-	VFS_ADD_MAPPING_PARAMETER_ERROR,
-	VFS_ADD_MAPPING_ALREADY_EXISTS,
-	VFS_ADD_MAPPING_OUT_OF_MEMORY,
+	VFS_ADD_INODE_PARAMETER_ERROR,
+	VFS_ADD_INODE_ALREADY_EXISTS,
+	VFS_ADD_INODE_OUT_OF_MEMORY,
 	VFS_MAP_EMPTY_PATH,
 	VFS_CWD_OUT_OF_MEMORY,
-	VFS_MAPPING_FINALIZATION_ERROR,
+	VFS_INODE_FINALIZATION_ERROR,
 	VFS_CWD_ILLEGAL,
 };
 
@@ -74,19 +74,19 @@ struct vfs_t {
 	char error_str[VFS_MAX_ERROR_LENGTH];
 	enum vfs_error_code_t last_error;
 	unsigned int max_handle_count;
-	unsigned int mapping_count;
+	unsigned int inode_count;
 	unsigned int base_flags;
 	unsigned int cwd_alloced_size;
 	unsigned int cwd_strlen;
 	char *cwd;
-	struct vfs_inode_t *mappings;
-	bool mappings_finalized;
+	struct vfs_inode_t *inodes;
+	bool inodes_finalized;
 };
 
 /*************** AUTO GENERATED SECTION FOLLOWS ***************/
-bool vfs_add_mapping(struct vfs_t *vfs, const char *virtual_path, const char *real_path, unsigned int flags);
+bool vfs_add_inode(struct vfs_t *vfs, const char *virtual_path, const char *real_path, unsigned int flags);
 bool vfs_map(struct vfs_t *vfs, struct vfs_map_result_t *result, const char *path);
-void vfs_finalize_mappings(struct vfs_t *vfs);
+void vfs_finalize_inodes(struct vfs_t *vfs);
 struct vfs_handle_t* vfs_opendir(const struct vfs_t *vfs, const char *virtual_path);
 struct vfs_t *vfs_init(void);
 void vfs_handle_free(struct vfs_handle_t *handle);
