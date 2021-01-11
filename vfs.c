@@ -46,8 +46,8 @@ static void vfs_set_error(struct vfs_t *vfs, enum vfs_error_code_t error_code, c
 }
 
 static struct vfs_inode_t *vfs_find_inode(struct vfs_t *vfs, const char *virtual_path) {
-	for (unsigned int i = 0; i < vfs->inode_count; i++) {
-		struct vfs_inode_t *inode = &vfs->inodes[i];
+	for (unsigned int i = 0; i < vfs->inode.count; i++) {
+		struct vfs_inode_t *inode = &vfs->inode.data[i];
 
 		/* Search for match with trailing slash */
 		if (!strcmp(inode->virtual_path, virtual_path)) {
@@ -64,18 +64,18 @@ static bool vfs_set_cwd(struct vfs_t *vfs, const char *new_cwd) {
 	}
 
 	int len = strlen(new_cwd);
-	if (len + 1 > vfs->cwd_alloced_size) {
+	if (len + 1 > vfs->cwd.alloced_size) {
 		/* Realloc necessary */
-		char *realloced_cwd = realloc(vfs->cwd, len + 1);
+		char *realloced_cwd = realloc(vfs->cwd.path, len + 1);
 		if (!realloced_cwd) {
 			vfs_set_error(vfs, VFS_CWD_OUT_OF_MEMORY, "out of memory when changing directory");
 			return false;
 		}
-		vfs->cwd = realloced_cwd;
-		vfs->cwd_strlen = len;
-		vfs->cwd_alloced_size = len + 1;
+		vfs->cwd.path = realloced_cwd;
+		vfs->cwd.length = len;
+		vfs->cwd.alloced_size = len + 1;
 	}
-	strcpy(vfs->cwd, new_cwd);
+	strcpy(vfs->cwd.path, new_cwd);
 	return true;
 }
 
@@ -113,15 +113,15 @@ bool vfs_add_inode(struct vfs_t *vfs, const char *virtual_path, const char *targ
 		return false;
 	}
 
-	struct vfs_inode_t *new_inodes = realloc(vfs->inodes, sizeof(struct vfs_inode_t) * (vfs->inode_count + 1));
+	struct vfs_inode_t *new_inodes = realloc(vfs->inode.data, sizeof(struct vfs_inode_t) * (vfs->inode.count + 1));
 	if (!new_inodes) {
 		vfs_set_error(vfs, VFS_ADD_INODE_OUT_OF_MEMORY, "error reallocating inode memory (%s)", strerror(errno));
 		return false;
 	}
-	vfs->inodes = new_inodes;
-	vfs->inode_count++;
+	vfs->inode.data = new_inodes;
+	vfs->inode.count++;
 
-	struct vfs_inode_t *new_inode = &vfs->inodes[vfs->inode_count - 1];
+	struct vfs_inode_t *new_inode = &vfs->inode.data[vfs->inode.count - 1];
 	memset(new_inode, 0, sizeof(*new_inode));
 	new_inode->flags = flags;
 	new_inode->virtual_path = vpath_copy;
@@ -150,7 +150,7 @@ static bool vfs_lookup_splitter(const char *path, void *vctx) {
 }
 
 bool vfs_lookup(struct vfs_t *vfs, struct vfs_lookup_result_t *result, const char *path) {
-	if (!vfs->inodes_finalized) {
+	if (!vfs->inode.finalized) {
 		vfs_set_error(vfs, VFS_INODE_FINALIZATION_ERROR, "inodes not finalized");
 		return false;
 	}
@@ -160,20 +160,20 @@ bool vfs_lookup(struct vfs_t *vfs, struct vfs_lookup_result_t *result, const cha
 
 	bool relative_path = (len == 0) || (path[0] != '/');
 	if (relative_path) {
-		total_len += vfs->cwd_strlen;
+		total_len += vfs->cwd.length;
 	}
 
 	/* One character more than needed so we can append '/' */
 	char mpath[total_len + 1 + 1];
 	if (relative_path) {
-		strcpy(mpath, vfs->cwd);
-		strcpy(mpath + vfs->cwd_strlen, path);
+		strcpy(mpath, vfs->cwd.path);
+		strcpy(mpath + vfs->cwd.length, path);
 	} else {
 		strcpy(mpath, path);
 	}
 
 	memset(result, 0, sizeof(*result));
-	result->flags = vfs->base_flags;
+	result->flags = vfs->inode.base_flags;
 
 	struct vfs_lookup_traversal_t ctx = {
 		.vfs = vfs,
@@ -199,19 +199,19 @@ static int vfs_inode_comparator(const void *velem1, const void *velem2) {
 }
 
 void vfs_finalize_inodes(struct vfs_t *vfs) {
-	if (vfs->inodes_finalized) {
+	if (vfs->inode.finalized) {
 		vfs_set_error(vfs, VFS_INODE_FINALIZATION_ERROR, "inodes already finalized");
 	}
 
-	unsigned int old_inode_count = vfs->inode_count;
+	unsigned int old_inode_count = vfs->inode.count;
 	for (unsigned int i = 0; i < old_inode_count; i++) {
-		struct vfs_inode_t *inode = &vfs->inodes[i];
+		struct vfs_inode_t *inode = &vfs->inode.data[i];
 		char mpath[inode->vlen + 1];
 		strcpy(mpath, inode->virtual_path);
 		path_split(mpath, vfs_finalization_splitter, vfs);
 	}
-	qsort(vfs->inodes, vfs->inode_count, sizeof(struct vfs_inode_t), vfs_inode_comparator);
-	vfs->inodes_finalized = true;
+	qsort(vfs->inode.data, vfs->inode.count, sizeof(struct vfs_inode_t), vfs_inode_comparator);
+	vfs->inode.finalized = true;
 }
 
 struct vfs_handle_t* vfs_opendir(const struct vfs_t *vfs, const char *virtual_path) {
@@ -234,7 +234,7 @@ struct vfs_t *vfs_init(void) {
 		return NULL;
 	}
 
-	vfs->max_handle_count = 10;
+	vfs->handles.max_count = 10;
 
 	return vfs;
 }
@@ -247,12 +247,12 @@ void vfs_free(struct vfs_t *vfs) {
 	if (!vfs) {
 		return;
 	}
-	free(vfs->cwd);
-	for (unsigned int i = 0; i < vfs->inode_count; i++) {
-		free(vfs->inodes[i].virtual_path);
-		free(vfs->inodes[i].target_path);
+	free(vfs->cwd.path);
+	for (unsigned int i = 0; i < vfs->inode.count; i++) {
+		free(vfs->inode.data[i].virtual_path);
+		free(vfs->inode.data[i].target_path);
 	}
-	free(vfs->inodes);
+	free(vfs->inode.data);
 	free(vfs);
 }
 

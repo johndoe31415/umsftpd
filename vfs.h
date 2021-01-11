@@ -76,14 +76,20 @@ struct vfs_t {
 		char string[VFS_MAX_ERROR_LENGTH];
 		enum vfs_error_code_t code;
 	} error;
-	unsigned int max_handle_count;
-	unsigned int inode_count;
-	unsigned int base_flags;
-	unsigned int cwd_alloced_size;
-	unsigned int cwd_strlen;
-	char *cwd;
-	struct vfs_inode_t *inodes;
-	bool inodes_finalized;
+	struct {
+		unsigned int max_count;
+	} handles;
+	struct {
+		unsigned int base_flags;
+		unsigned int count;
+		struct vfs_inode_t *data;
+		bool finalized;
+	} inode;
+	struct {
+		unsigned int alloced_size;
+		unsigned int length;
+		char *path;
+	} cwd;
 };
 
 /*************** AUTO GENERATED SECTION FOLLOWS ***************/
