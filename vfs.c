@@ -225,15 +225,6 @@ bool vfs_lookup(struct vfs_t *vfs, struct vfs_lookup_result_t *result, const cha
 	return true;
 }
 
-static bool vfs_finalization_splitter(const char *path, bool is_full_path, void *vctx) {
-	struct vfs_t *vfs = (struct vfs_t*)vctx;
-	struct vfs_inode_t *inode = vfs_find_inode(vfs, path);
-	if (!inode) {
-		vfs_add_inode(vfs, path, NULL, 0);
-	}
-	return true;
-}
-
 static int vfs_inode_comparator(const void *velem1, const void *velem2) {
 	const struct vfs_inode_t **elem1 = (const struct vfs_inode_t **)velem1;
 	const struct vfs_inode_t **elem2 = (const struct vfs_inode_t **)velem2;
@@ -245,14 +236,6 @@ static int vfs_inode_comparator(const void *velem1, const void *velem2) {
 void vfs_freeze_inodes(struct vfs_t *vfs) {
 	if (vfs->inode.frozen) {
 		vfs_set_error(vfs, VFS_INODE_FINALIZATION_ERROR, "inodes already frozen");
-	}
-
-	unsigned int old_inode_count = vfs->inode.count;
-	for (unsigned int i = 0; i < old_inode_count; i++) {
-		struct vfs_inode_t *inode = vfs->inode.data[i];
-		char mpath[inode->vlen + 1];
-		strcpy(mpath, inode->virtual_path);
-		path_split(mpath, vfs_finalization_splitter, vfs);
 	}
 	qsort(vfs->inode.data, vfs->inode.count, sizeof(struct vfs_inode_t*), vfs_inode_comparator);
 	vfs->inode.frozen = true;
