@@ -12,7 +12,8 @@ OBJS := \
 	main.o \
 	logging.o \
 	vfs.o \
-	stringlist.o
+	stringlist.o \
+	strings.o
 
 BINARIES := umsftpd vfstest
 
@@ -21,7 +22,7 @@ all: umsftpd
 umsftpd: $(OBJS)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
-vfstest: vfs.c stringlist.c
+vfstest: vfs.c stringlist.c strings.c
 	$(CC) $(CFLAGS) -D__VFS_TEST__ -o $@ $^ $(LDFLAGS)
 
 clean:

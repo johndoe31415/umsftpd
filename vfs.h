@@ -38,7 +38,7 @@
 #define VFS_MAPPING_FLAG_DISALLOW_CREATE_DIR	(1 << 5)
 #define VFS_MAPPING_FLAG_DISALLOW_UNLINK		(1 << 6)
 
-struct vfs_mapping_target_t {
+struct vfs_inode_t {
 	char *virtual_path;
 	unsigned int flags;
 	char *target;
@@ -47,8 +47,8 @@ struct vfs_mapping_target_t {
 
 struct vfs_map_result_t {
 	unsigned int flags;
-	struct vfs_mapping_target_t *mountpoint;
-	struct vfs_mapping_target_t *target;
+	struct vfs_inode_t *mountpoint;
+	struct vfs_inode_t *target;
 };
 
 enum vfs_handle_type_t {
@@ -79,7 +79,7 @@ struct vfs_t {
 	unsigned int cwd_alloced_size;
 	unsigned int cwd_strlen;
 	char *cwd;
-	struct vfs_mapping_target_t *mappings;
+	struct vfs_inode_t *mappings;
 	bool mappings_finalized;
 };
 

@@ -29,14 +29,12 @@
 
 #include "vfs.h"
 #include "logging.h"
-
-typedef bool (*path_split_callback_t)(const char *path, void *vctx);
+#include "strings.h"
 
 struct vfs_map_traversal_t {
 	struct vfs_t *vfs;
 	struct vfs_map_result_t *map_result;
 };
-
 
 static void vfs_set_error(struct vfs_t *vfs, enum vfs_error_code_t error_code, const char *msg, ...) {
 	vfs->last_error = error_code;
@@ -47,11 +45,11 @@ static void vfs_set_error(struct vfs_t *vfs, enum vfs_error_code_t error_code, c
 	va_end(ap);
 }
 
-static struct vfs_mapping_target_t *vfs_find_mapping(struct vfs_t *vfs, const char *virtual_path) {
+static struct vfs_inode_t *vfs_find_mapping(struct vfs_t *vfs, const char *virtual_path) {
 	int vpath_len = strlen(virtual_path);
 
 	for (unsigned int i = 0; i < vfs->mapping_count; i++) {
-		struct vfs_mapping_target_t *mapping = &vfs->mappings[i];
+		struct vfs_inode_t *mapping = &vfs->mappings[i];
 
 		/* Search for match with trailing slash */
 		if (!strcmp(mapping->virtual_path, virtual_path)) {
@@ -68,17 +66,12 @@ static struct vfs_mapping_target_t *vfs_find_mapping(struct vfs_t *vfs, const ch
 }
 
 static bool vfs_set_cwd(struct vfs_t *vfs, const char *new_cwd) {
-	if (new_cwd[0] != '/') {
-		vfs_set_error(vfs, VFS_CWD_ILLEGAL, "working directory must start with '/' character");
+	if (!is_directory_string(new_cwd)) {
+		vfs_set_error(vfs, VFS_CWD_ILLEGAL, "working directory must start and end with '/' character");
 		return false;
 	}
 
 	int len = strlen(new_cwd);
-	if (new_cwd[len - 1] != '/') {
-		vfs_set_error(vfs, VFS_CWD_ILLEGAL, "working directory must end with '/' character");
-		return false;
-	}
-
 	if (len + 1 > vfs->cwd_alloced_size) {
 		/* Realloc necessary */
 		char *realloced_cwd = realloc(vfs->cwd, len + 1);
@@ -95,33 +88,17 @@ static bool vfs_set_cwd(struct vfs_t *vfs, const char *new_cwd) {
 }
 
 bool vfs_add_mapping(struct vfs_t *vfs, const char *virtual_path, const char *real_path, unsigned int flags) {
-	size_t vlen = strlen(virtual_path);
-	if (vlen == 0) {
-		vfs_set_error(vfs, VFS_ADD_MAPPING_PARAMETER_ERROR, "empty virtual path is disallowed");
-		return false;
-	}
-	if (virtual_path[0] != '/') {
-		vfs_set_error(vfs, VFS_ADD_MAPPING_PARAMETER_ERROR, "virtual path must start with a '/' character");
-		return false;
-	}
-	if (virtual_path[vlen - 1] != '/') {
-		vfs_set_error(vfs, VFS_ADD_MAPPING_PARAMETER_ERROR, "virtual path must end with a '/' character");
+	if (!is_directory_string(virtual_path)) {
+		vfs_set_error(vfs, VFS_ADD_MAPPING_PARAMETER_ERROR, "virtual path must start and end with a '/' character");
 		return false;
 	}
 
+	size_t vlen = strlen(virtual_path);
 	size_t rlen = 0;
 	if (real_path) {
 		rlen = strlen(real_path);
-		if (rlen == 0) {
-			vfs_set_error(vfs, VFS_ADD_MAPPING_PARAMETER_ERROR, "empty real path is disallowed");
-			return false;
-		}
-		if (real_path[0] != '/') {
-			vfs_set_error(vfs, VFS_ADD_MAPPING_PARAMETER_ERROR, "real path must begin with a '/' character");
-			return false;
-		}
-		if (real_path[rlen - 1] != '/') {
-			vfs_set_error(vfs, VFS_ADD_MAPPING_PARAMETER_ERROR, "real path must end with a '/' character");
+		if (!is_directory_string(real_path)) {
+			vfs_set_error(vfs, VFS_ADD_MAPPING_PARAMETER_ERROR, "real path must start and end with a '/' character");
 			return false;
 		}
 	}
@@ -144,7 +121,7 @@ bool vfs_add_mapping(struct vfs_t *vfs, const char *virtual_path, const char *re
 		return false;
 	}
 
-	struct vfs_mapping_target_t *new_mappings = realloc(vfs->mappings, sizeof(struct vfs_mapping_target_t) * (vfs->mapping_count + 1));
+	struct vfs_inode_t *new_mappings = realloc(vfs->mappings, sizeof(struct vfs_inode_t) * (vfs->mapping_count + 1));
 	if (!new_mappings) {
 		vfs_set_error(vfs, VFS_ADD_MAPPING_OUT_OF_MEMORY, "error reallocating mapping memory (%s)", strerror(errno));
 		return false;
@@ -152,7 +129,7 @@ bool vfs_add_mapping(struct vfs_t *vfs, const char *virtual_path, const char *re
 	vfs->mappings = new_mappings;
 	vfs->mapping_count++;
 
-	struct vfs_mapping_target_t *new_mapping = &vfs->mappings[vfs->mapping_count - 1];
+	struct vfs_inode_t *new_mapping = &vfs->mappings[vfs->mapping_count - 1];
 	memset(new_mapping, 0, sizeof(*new_mapping));
 	new_mapping->virtual_path = vpath_copy;
 	new_mapping->flags = flags;
@@ -165,7 +142,7 @@ bool vfs_add_mapping(struct vfs_t *vfs, const char *virtual_path, const char *re
 
 static bool vfs_map_splitter(const char *path, void *vctx) {
 	struct vfs_map_traversal_t *ctx = (struct vfs_map_traversal_t*)vctx;
-	struct vfs_mapping_target_t *mapping = vfs_find_mapping(ctx->vfs, path);
+	struct vfs_inode_t *mapping = vfs_find_mapping(ctx->vfs, path);
 	if (mapping) {
 		if (mapping->flags & VFS_MAPPING_FLAG_RESET) {
 			ctx->map_result->flags = mapping->flags & ~VFS_MAPPING_FLAG_RESET;
@@ -178,21 +155,6 @@ static bool vfs_map_splitter(const char *path, void *vctx) {
 		}
 	}
 	return true;
-}
-
-static void path_split(char *path, path_split_callback_t callback, void *vctx) {
-	size_t len = strlen(path);
-	for (size_t i = 0; i < len; i++) {
-		if (path[i] == '/') {
-			char saved = path[i + 1];
-			path[i + 1] = 0;
-			bool continue_splitting = callback(path, vctx);
-			path[i + 1] = saved;
-			if (!continue_splitting) {
-				break;
-			}
-		}
-	}
 }
 
 bool vfs_map(struct vfs_t *vfs, struct vfs_map_result_t *result, const char *path) {
@@ -231,7 +193,7 @@ bool vfs_map(struct vfs_t *vfs, struct vfs_map_result_t *result, const char *pat
 
 static bool vfs_finalization_splitter(const char *path, void *vctx) {
 	struct vfs_t *vfs = (struct vfs_t*)vctx;
-	struct vfs_mapping_target_t *mapping = vfs_find_mapping(vfs, path);
+	struct vfs_inode_t *mapping = vfs_find_mapping(vfs, path);
 	if (!mapping) {
 		vfs_add_mapping(vfs, path, NULL, 0);
 	}
@@ -239,8 +201,8 @@ static bool vfs_finalization_splitter(const char *path, void *vctx) {
 }
 
 static int vfs_mapping_comparator(const void *velem1, const void *velem2) {
-	const struct vfs_mapping_target_t *elem1 = (const struct vfs_mapping_target_t *)velem1;
-	const struct vfs_mapping_target_t *elem2 = (const struct vfs_mapping_target_t *)velem2;
+	const struct vfs_inode_t *elem1 = (const struct vfs_inode_t *)velem1;
+	const struct vfs_inode_t *elem2 = (const struct vfs_inode_t *)velem2;
 	return strcmp(elem1->virtual_path, elem2->virtual_path);
 }
 
@@ -251,12 +213,12 @@ void vfs_finalize_mappings(struct vfs_t *vfs) {
 
 	unsigned int old_mapping_count = vfs->mapping_count;
 	for (unsigned int i = 0; i < old_mapping_count; i++) {
-		struct vfs_mapping_target_t *mapping = &vfs->mappings[i];
+		struct vfs_inode_t *mapping = &vfs->mappings[i];
 		char mpath[mapping->vlen + 1];
 		strcpy(mpath, mapping->virtual_path);
 		path_split(mpath, vfs_finalization_splitter, vfs);
 	}
-	qsort(vfs->mappings, vfs->mapping_count, sizeof(struct vfs_mapping_target_t), vfs_mapping_comparator);
+	qsort(vfs->mappings, vfs->mapping_count, sizeof(struct vfs_inode_t), vfs_mapping_comparator);
 	vfs->mappings_finalized = true;
 }
 
@@ -326,7 +288,7 @@ static void vfs_dump_flags(FILE *f, unsigned int flags) {
 	}
 }
 
-static void vfs_dump_mapping_target(FILE *f, const struct vfs_mapping_target_t *mapping) {
+static void vfs_dump_mapping_target(FILE *f, const struct vfs_inode_t *mapping) {
 	fprintf(f, "%s", mapping->virtual_path);
 	if (mapping->target) {
 		fprintf(f, " => %s", mapping->target);
@@ -348,7 +310,7 @@ void vfs_dump(FILE *f, const struct vfs_t *vfs) {
 	vfs_dump_flags(f, vfs->base_flags);
 	fprintf(f, "\n");
 	for (unsigned int i = 0; i < vfs->mapping_count; i++) {
-		struct vfs_mapping_target_t *mapping = &vfs->mappings[i];
+		struct vfs_inode_t *mapping = &vfs->mappings[i];
 		fprintf(f, "   Mapping %2d of %d: ", i + 1, vfs->mapping_count);
 		vfs_dump_mapping_target(f, mapping);
 		fprintf(f, "\n");
