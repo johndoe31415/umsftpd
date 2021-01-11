@@ -46,8 +46,6 @@ static void vfs_set_error(struct vfs_t *vfs, enum vfs_error_code_t error_code, c
 }
 
 static struct vfs_inode_t *vfs_find_inode(struct vfs_t *vfs, const char *virtual_path) {
-	int vpath_len = strlen(virtual_path);
-
 	for (unsigned int i = 0; i < vfs->inode_count; i++) {
 		struct vfs_inode_t *inode = &vfs->inodes[i];
 
@@ -55,12 +53,6 @@ static struct vfs_inode_t *vfs_find_inode(struct vfs_t *vfs, const char *virtual
 		if (!strcmp(inode->virtual_path, virtual_path)) {
 			return inode;
 		}
-
-		/* But also find it if there is no trailing slash */
-		if ((vpath_len == inode->vlen - 1) && (!strncmp(inode->virtual_path, virtual_path, inode->vlen - 1))) {
-			return inode;
-		}
-
 	}
 	return NULL;
 }
@@ -87,17 +79,17 @@ static bool vfs_set_cwd(struct vfs_t *vfs, const char *new_cwd) {
 	return true;
 }
 
-bool vfs_add_inode(struct vfs_t *vfs, const char *virtual_path, const char *real_path, unsigned int flags) {
+bool vfs_add_inode(struct vfs_t *vfs, const char *virtual_path, const char *target_path, unsigned int flags) {
 	if (!is_directory_string(virtual_path)) {
 		vfs_set_error(vfs, VFS_ADD_INODE_PARAMETER_ERROR, "virtual path must start and end with a '/' character");
 		return false;
 	}
 
 	size_t vlen = strlen(virtual_path);
-	size_t rlen = 0;
-	if (real_path) {
-		rlen = strlen(real_path);
-		if (!is_directory_string(real_path)) {
+	size_t tlen = 0;
+	if (target_path) {
+		tlen = strlen(target_path);
+		if (!is_directory_string(target_path)) {
 			vfs_set_error(vfs, VFS_ADD_INODE_PARAMETER_ERROR, "real path must start and end with a '/' character");
 			return false;
 		}
@@ -114,8 +106,8 @@ bool vfs_add_inode(struct vfs_t *vfs, const char *virtual_path, const char *real
 		return false;
 	}
 
-	char *rpath_copy = real_path ? strdup(real_path) : NULL;
-	if (real_path && (!rpath_copy)) {
+	char *tpath_copy = target_path ? strdup(target_path) : NULL;
+	if (target_path && (!tpath_copy)) {
 		free(vpath_copy);
 		vfs_set_error(vfs, VFS_ADD_INODE_OUT_OF_MEMORY, "error dupping real path (%s)", strerror(errno));
 		return false;
@@ -131,11 +123,11 @@ bool vfs_add_inode(struct vfs_t *vfs, const char *virtual_path, const char *real
 
 	struct vfs_inode_t *new_inode = &vfs->inodes[vfs->inode_count - 1];
 	memset(new_inode, 0, sizeof(*new_inode));
-	new_inode->virtual_path = vpath_copy;
 	new_inode->flags = flags;
-	new_inode->target = rpath_copy;
+	new_inode->virtual_path = vpath_copy;
+	new_inode->target_path = tpath_copy;
 	new_inode->vlen = vlen;
-	new_inode->rlen = rlen;
+	new_inode->tlen = tlen;
 
 	return true;
 }
@@ -150,7 +142,7 @@ static bool vfs_map_splitter(const char *path, void *vctx) {
 			ctx->map_result->flags |= inode->flags;
 		}
 		ctx->map_result->target = inode;
-		if (inode->target) {
+		if (inode->target_path) {
 			ctx->map_result->mountpoint = inode;
 		}
 	}
@@ -257,8 +249,8 @@ void vfs_free(struct vfs_t *vfs) {
 	}
 	free(vfs->cwd);
 	for (unsigned int i = 0; i < vfs->inode_count; i++) {
-		free(vfs->inodes[i].target);
 		free(vfs->inodes[i].virtual_path);
+		free(vfs->inodes[i].target_path);
 	}
 	free(vfs->inodes);
 	free(vfs);

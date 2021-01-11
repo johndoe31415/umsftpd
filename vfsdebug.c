@@ -49,8 +49,8 @@ static void vfs_dump_flags(FILE *f, unsigned int flags) {
 
 static void vfs_dump_inode_target(FILE *f, const struct vfs_inode_t *inode) {
 	fprintf(f, "%s", inode->virtual_path);
-	if (inode->target) {
-		fprintf(f, " => %s", inode->target);
+	if (inode->target_path) {
+		fprintf(f, " => %s", inode->target_path);
 	}
 	if (inode->flags) {
 		fprintf(f, " [flags: 0x%x ", inode->flags);

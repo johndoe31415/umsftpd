@@ -28,21 +28,21 @@
 #include <stdbool.h>
 #include "stringlist.h"
 
-#define VFS_MAX_ERROR_LENGTH		64
+#define VFS_MAX_ERROR_LENGTH					64
 
 #define VFS_INODE_FLAG_RESET					(1 << 0)
 #define VFS_INODE_FLAG_READ_ONLY				(1 << 1)
 #define VFS_INODE_FLAG_FILTER_ALL				(1 << 2)
 #define VFS_INODE_FLAG_FILTER_HIDDEN			(1 << 3)
-#define VFS_INODE_FLAG_DISALLOW_CREATE_FILE	(1 << 4)
-#define VFS_INODE_FLAG_DISALLOW_CREATE_DIR	(1 << 5)
-#define VFS_INODE_FLAG_DISALLOW_UNLINK		(1 << 6)
+#define VFS_INODE_FLAG_DISALLOW_CREATE_FILE		(1 << 4)
+#define VFS_INODE_FLAG_DISALLOW_CREATE_DIR		(1 << 5)
+#define VFS_INODE_FLAG_DISALLOW_UNLINK			(1 << 6)
 
 struct vfs_inode_t {
-	char *virtual_path;
 	unsigned int flags;
-	char *target;
-	size_t vlen, rlen;
+	char *virtual_path;
+	char *target_path;
+	size_t vlen, tlen;
 };
 
 struct vfs_map_result_t {
