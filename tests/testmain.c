@@ -21,19 +21,36 @@
  *	Johannes Bauer <JohannesBauer@gmx.de>
 **/
 
-#ifndef __STRINGS_H__
-#define __STRINGS_H__
+#include <stdio.h>
+#include "testbench.h"
 
-#include <stdbool.h>
+%for testcase in testcases:
+void ${testcase.function_name}(void);
+%endfor
 
-typedef bool (*path_split_callback_t)(const char *path, bool is_full_path, void *vctx);
+static const char *test_name = "${test_name}";
+static struct testcase_t testcases[] = {
+%for testcase in testcases:
+	{
+		.name = "${testcase.name}",
+		.entry = ${testcase.function_name},
+	},
+%endfor
+};
 
-/*************** AUTO GENERATED SECTION FOLLOWS ***************/
-void path_split(const char *path, path_split_callback_t callback, void *vctx);
-bool pathcmp(const char *path1, const char *path2);
-void truncate_trailing_slash(char *path);
-bool is_valid_path(const char *path);
-bool is_absolute_path(const char *path);
-/***************  AUTO GENERATED SECTION ENDS   ***************/
+int main(int argc, char **argv) {
+	const unsigned int test_count = sizeof(testcases) / sizeof(struct testcase_t);
+	tests_run_all(testcases, test_count);
 
-#endif
+	unsigned int pass_cnt = 0;
+	unsigned int fail_cnt = 0;
+	for (unsigned int i = 0; i < test_count; i++) {
+		if (testcases[i].outcome == TEST_FAILED) {
+			fail_cnt++;
+		} else if (testcases[i].outcome == TEST_PASSED) {
+			pass_cnt++;
+		}
+	}
+	fprintf(stderr, "%s: %d tests run, %d pass and %d FAIL.\n", test_name, pass_cnt + fail_cnt, pass_cnt, fail_cnt);
+	return (fail_cnt == 0) ? 0 : 1;
+}

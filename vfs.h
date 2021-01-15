@@ -49,7 +49,7 @@ struct vfs_inode_t {
 struct vfs_lookup_result_t {
 	unsigned int flags;
 	struct vfs_inode_t *mountpoint;
-	struct vfs_inode_t *target;
+	bool virtual_directory;
 };
 
 enum vfs_handle_type_t {
@@ -69,6 +69,7 @@ enum vfs_error_code_t {
 	VFS_CWD_OUT_OF_MEMORY,
 	VFS_INODE_FINALIZATION_ERROR,
 	VFS_CWD_ILLEGAL,
+	VFS_LOOKUP_NON_ABSOLUTE,
 };
 
 struct vfs_t {

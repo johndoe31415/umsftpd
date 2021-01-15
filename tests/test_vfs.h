@@ -21,19 +21,13 @@
  *	Johannes Bauer <JohannesBauer@gmx.de>
 **/
 
-#ifndef __STRINGS_H__
-#define __STRINGS_H__
-
-#include <stdbool.h>
-
-typedef bool (*path_split_callback_t)(const char *path, bool is_full_path, void *vctx);
+#ifndef __TEST_VFS_H__
+#define __TEST_VFS_H__
 
 /*************** AUTO GENERATED SECTION FOLLOWS ***************/
-void path_split(const char *path, path_split_callback_t callback, void *vctx);
-bool pathcmp(const char *path1, const char *path2);
-void truncate_trailing_slash(char *path);
-bool is_valid_path(const char *path);
-bool is_absolute_path(const char *path);
+void test_empty_vfs(void);
+void test_vfs_lookup(void);
+void test_vfs_ro_root(void);
 /***************  AUTO GENERATED SECTION ENDS   ***************/
 
 #endif

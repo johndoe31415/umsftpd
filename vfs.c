@@ -57,7 +57,7 @@ static struct vfs_inode_t *vfs_find_inode(struct vfs_t *vfs, const char *virtual
 		struct vfs_inode_t *inode = vfs->inode.data[i];
 
 		/* Search for match with trailing slash */
-		if (!strcmp(inode->virtual_path, virtual_path)) {
+		if (pathcmp(inode->virtual_path, virtual_path)) {
 			return inode;
 		}
 	}
@@ -65,8 +65,8 @@ static struct vfs_inode_t *vfs_find_inode(struct vfs_t *vfs, const char *virtual
 }
 
 static bool vfs_set_cwd(struct vfs_t *vfs, const char *new_cwd) {
-	if (!is_directory_string(new_cwd)) {
-		vfs_set_error(vfs, VFS_CWD_ILLEGAL, "working directory must start and end with '/' character");
+	if (!is_absolute_path(new_cwd)) {
+		vfs_set_error(vfs, VFS_CWD_ILLEGAL, "working directory must be an absolute path");
 		return false;
 	}
 
@@ -83,6 +83,7 @@ static bool vfs_set_cwd(struct vfs_t *vfs, const char *new_cwd) {
 		vfs->cwd.alloced_size = len + 1;
 	}
 	strcpy(vfs->cwd.path, new_cwd);
+	truncate_trailing_slash(vfs->cwd.path);
 	return true;
 }
 
@@ -110,12 +111,16 @@ static struct vfs_inode_t* vfs_add_single_inode(struct vfs_t *vfs, const char *v
 		vfs_set_error(vfs, VFS_ADD_INODE_OUT_OF_MEMORY, "error dupping virtual path (%s)", strerror(errno));
 		return NULL;
 	}
+	truncate_trailing_slash(vpath_copy);
 
 	char *tpath_copy = target_path ? strdup(target_path) : NULL;
 	if (target_path && (!tpath_copy)) {
 		free(vpath_copy);
 		vfs_set_error(vfs, VFS_ADD_INODE_OUT_OF_MEMORY, "error dupping real path (%s)", strerror(errno));
 		return NULL;
+	}
+	if (tpath_copy) {
+		truncate_trailing_slash(tpath_copy);
 	}
 
 	struct vfs_inode_t *new_inode = calloc(1, sizeof(struct vfs_inode_t));
@@ -148,13 +153,13 @@ static struct vfs_inode_t* vfs_add_single_inode(struct vfs_t *vfs, const char *v
 }
 
 bool vfs_add_inode(struct vfs_t *vfs, const char *virtual_path, const char *target_path, unsigned int flags) {
-	if (!is_directory_string(virtual_path)) {
-		vfs_set_error(vfs, VFS_ADD_INODE_PARAMETER_ERROR, "virtual path must start and end with a '/' character");
+	if (!is_absolute_path(virtual_path)) {
+		vfs_set_error(vfs, VFS_ADD_INODE_PARAMETER_ERROR, "virtual path must start with a '/' character");
 		return false;
 	}
 
-	if (target_path && !is_directory_string(target_path)) {
-		vfs_set_error(vfs, VFS_ADD_INODE_PARAMETER_ERROR, "target path must start and end with a '/' character");
+	if (target_path && !is_absolute_path(target_path)) {
+		vfs_set_error(vfs, VFS_ADD_INODE_PARAMETER_ERROR, "target path must start with a '/' character");
 		return false;
 	}
 
@@ -183,7 +188,9 @@ static bool vfs_lookup_splitter(const char *path, bool is_full_path, void *vctx)
 		} else {
 			ctx->map_result->flags |= inode->flags;
 		}
-		ctx->map_result->target = inode;
+		if (is_full_path) {
+			ctx->map_result->virtual_directory = true;
+		}
 		if (inode->target_path) {
 			ctx->map_result->mountpoint = inode;
 		}
@@ -194,6 +201,11 @@ static bool vfs_lookup_splitter(const char *path, bool is_full_path, void *vctx)
 bool vfs_lookup(struct vfs_t *vfs, struct vfs_lookup_result_t *result, const char *path) {
 	if (!vfs->inode.frozen) {
 		vfs_set_error(vfs, VFS_INODE_FINALIZATION_ERROR, "inodes not frozen");
+		return false;
+	}
+
+	if (!is_absolute_path(path)) {
+		vfs_set_error(vfs, VFS_LOOKUP_NON_ABSOLUTE, "can only look up absolute path in VFS");
 		return false;
 	}
 
@@ -237,7 +249,9 @@ void vfs_freeze_inodes(struct vfs_t *vfs) {
 	if (vfs->inode.frozen) {
 		vfs_set_error(vfs, VFS_INODE_FINALIZATION_ERROR, "inodes already frozen");
 	}
-	qsort(vfs->inode.data, vfs->inode.count, sizeof(struct vfs_inode_t*), vfs_inode_comparator);
+	if (vfs->inode.count) {
+		qsort(vfs->inode.data, vfs->inode.count, sizeof(struct vfs_inode_t*), vfs_inode_comparator);
+	}
 	vfs->inode.frozen = true;
 }
 
@@ -283,33 +297,3 @@ void vfs_free(struct vfs_t *vfs) {
 	free(vfs->inode.data);
 	free(vfs);
 }
-
-#ifdef __VFS_TEST__
-#include "vfsdebug.h"
-
-int main(void) {
-	struct vfs_t *vfs = vfs_init();
-//	vfs_add_inode(vfs, "/pics/", "/home/joe/pics/", 0);
-	vfs_add_inode(vfs, "/pics/foo/neu/", "/home/joe/pics_neu/", VFS_INODE_FLAG_READ_ONLY);
-	/*
-	vfs_add_inode(vfs, "/this/is/", NULL, VFS_INODE_FLAG_DISALLOW_CREATE_DIR);
-	vfs_add_inode(vfs, "/this/is/deeply/nested/", "/home/joe/nested/", VFS_INODE_FLAG_READ_ONLY);
-	vfs_add_inode(vfs, "/zeug/", "/tmp/zeug/", 0);
-	vfs_add_inode(vfs, "/incoming/", "/tmp/write/", VFS_INODE_FLAG_DISALLOW_UNLINK);
-	*/
-	fprintf(stderr, "=========================\n");
-	vfs_freeze_inodes(vfs);
-	vfs_dump(stderr, vfs);
-
-	struct vfs_lookup_result_t result;
-	//vfs_lookup(vfs, &result, "/pics/DCIM/12345.jpg");
-//	vfs_lookup(vfs, &result, "/pics/foo/bar");
-//	vfs_lookup(vfs, &result, "/pics/foo/neu/bar");
-	//vfs_lookup(vfs, &result, "/");
-
-	vfs_dump_map_result(stderr, &result);
-
-	vfs_free(vfs);
-	return 0;
-}
-#endif

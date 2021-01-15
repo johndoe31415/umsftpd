@@ -30,20 +30,54 @@ void path_split(const char *path, path_split_callback_t callback, void *vctx) {
 	strcpy(copy, path);
 
 	for (size_t i = 0; i < len; i++) {
+		bool is_full_path = (i == (len - 1));
 		if (copy[i] == '/') {
-			char saved = copy[i + 1];
-			copy[i + 1] = 0;
-			bool is_full_path = (i == (len - 1));
-			bool continue_splitting = callback(copy, is_full_path, vctx);
-			copy[i + 1] = saved;
-			if (!continue_splitting) {
-				break;
+			if (i == 0) {
+				char root[2] = "/";
+				if (!callback(root, is_full_path, vctx)) {
+					break;
+				}
+			} else {
+				copy[i] = 0;
+				if (!callback(copy, is_full_path, vctx)) {
+					break;
+				}
+				copy[i] = '/';
 			}
+		} else if (is_full_path) {
+			callback(copy, is_full_path, vctx);
 		}
 	}
 }
 
-bool is_directory_string(const char *path) {
+bool pathcmp(const char *path1, const char *path2) {
+	int len1, len2;
+	len1 = strlen(path1);
+	len2 = strlen(path2);
+	if (len1 && (path1[len1 - 1] == '/')) {
+		len1 -= 1;
+	}
+	if (len2 && (path2[len2 - 1] == '/')) {
+		len2 -= 1;
+	}
+	if (len1 != len2) {
+		return false;
+	}
+	return !strncmp(path1, path2, len1);
+}
+
+void truncate_trailing_slash(char *path) {
 	int len = strlen(path);
-	return (len > 0) && (path[0] == '/') && (path[len - 1] == '/');
+	while (len && (path[len - 1] == '/')) {
+		path[--len] = 0;
+	}
+}
+
+bool is_valid_path(const char *path) {
+	int len = strlen(path);
+	return (len > 0) && (path[0] == '/') && (path[len - 1] != '/');
+}
+
+bool is_absolute_path(const char *path) {
+	return path[0] == '/';
 }

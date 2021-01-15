@@ -64,13 +64,13 @@ void vfs_dump(FILE *f, const struct vfs_t *vfs) {
 	if (vfs->error.code) {
 		fprintf(f, "   Last error: %d (%s)\n", vfs->error.code, vfs->error.string);
 	}
-	fprintf(f, "   Max handles: %d, Mappings: %d\n", vfs->handles.max_count, vfs->inode.count);
+	fprintf(f, "   Max handles: %d, Inodes: %d\n", vfs->handles.max_count, vfs->inode.count);
 	fprintf(f, "   Base flags: 0x%x ", vfs->inode.base_flags);
 	vfs_dump_flags(f, vfs->inode.base_flags);
 	fprintf(f, "\n");
 	for (unsigned int i = 0; i < vfs->inode.count; i++) {
 		struct vfs_inode_t *inode = vfs->inode.data[i];
-		fprintf(f, "   Mapping %2d of %d: ", i + 1, vfs->inode.count);
+		fprintf(f, "   Inode %2d of %d: ", i + 1, vfs->inode.count);
 		vfs_dump_inode_target(f, inode);
 		fprintf(f, "\n");
 	}
@@ -87,11 +87,44 @@ void vfs_dump_map_result(FILE *f, const struct vfs_lookup_result_t *map_result) 
 	} else {
 		fprintf(f, "No mountpoint.\n");
 	}
-	if (map_result->target) {
-		fprintf(f, "Target: ");
-		vfs_dump_inode_target(f, map_result->target);
-		fprintf(f, "\n");
-	} else {
-		fprintf(f, "No target.\n");
-	}
+	fprintf(f, "Virtual directory: %s\n", map_result->virtual_directory ? "yes" : "no");
 }
+
+#ifdef __VFS_TEST__
+#include "vfs.h"
+
+int main(void) {
+	struct vfs_t *vfs = vfs_init();
+	vfs_add_inode(vfs, "/", NULL, VFS_INODE_FLAG_READ_ONLY);
+	vfs_add_inode(vfs, "/pics/", "/home/joe/pics/", 0);
+	vfs_add_inode(vfs, "/pics/foo/neu/", NULL, 0);
+	vfs_add_inode(vfs, "/this/is/", NULL, VFS_INODE_FLAG_DISALLOW_CREATE_DIR | VFS_INODE_FLAG_READ_ONLY);
+	vfs_add_inode(vfs, "/this/is/deeply/nested/", "/home/joe/nested/", VFS_INODE_FLAG_READ_ONLY);
+	vfs_add_inode(vfs, "/zeug/", "/tmp/zeug/", 0);
+	vfs_add_inode(vfs, "/incoming/", "/tmp/write/", VFS_INODE_FLAG_DISALLOW_UNLINK);
+	fprintf(stderr, "=========================\n");
+	vfs_freeze_inodes(vfs);
+	vfs_dump(stderr, vfs);
+	printf("\n");
+
+	struct vfs_lookup_result_t result;
+
+	const char *lookup_nodes[] = {
+		"/",
+		"/pics/foo/neu/bar",
+		"/foo/bar",
+		"/this",
+		"/pics/DCIM/12345.jpg",
+		"foo"
+	};
+	for (unsigned int i = 0; i < sizeof(lookup_nodes) / sizeof(const char*); i++) {
+		const char *lookup = lookup_nodes[i];
+		printf("%s\n", lookup);
+		vfs_lookup(vfs, &result, lookup);
+		vfs_dump_map_result(stderr, &result);
+		printf("\n");
+	}
+	vfs_free(vfs);
+	return 0;
+}
+#endif
