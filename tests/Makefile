@@ -2,16 +2,8 @@
 
 vpath %.c ..
 
-CFLAGS := -std=c11 -D_POSIX_C_SOURCE=200112L -D_XOPEN_SOURCE=500 -Wall -Wmissing-prototypes -Wstrict-prototypes -Werror=implicit-function-declaration -O3 -I.. -g3
-ifneq ($(USER),travis)
-# On Travis-CI, gcc does not support "undefined" and "leak" sanitizers.
-# Furthermore (and worse, actually), there seems to be a kernel < 4.12.8
-# installed which causes the address sanitizer to cause spurious fails ("Shadow
-# memory range interleaves with an existing memory mapping. ASan cannot proceed
-# correctly. ABORTING."), leading to a broken build. Therefore we do not run
-# sanitizers on Travis.
+CFLAGS := -std=c11 -D_POSIX_C_SOURCE=200112L -D_XOPEN_SOURCE=500 -Wall -Werror -Wmissing-prototypes -Wstrict-prototypes -Werror=implicit-function-declaration -O3 -I.. -g3
 CFLAGS += -pie -fPIE -fsanitize=address -fsanitize=undefined -fsanitize=leak
-endif
 LDFLAGS :=
 
 TEST_COMMON_OBJS := testbench.o testmain.o
