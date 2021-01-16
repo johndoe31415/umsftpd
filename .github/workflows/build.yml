@@ -20,8 +20,8 @@ jobs:
           cd libssh-build
           cmake ../libssh
           sudo make install
-#    - name: Install dependencies
-#      run: sudo apt-get install libssh-dev
+    - name: Install dependencies
+      run: sudo apt-get install python3-mako
     - name: make
       run: make
     - name: make tests
