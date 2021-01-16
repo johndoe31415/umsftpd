@@ -47,12 +47,20 @@ static void verify_vfs_lookups(struct vfs_t *vfs, const struct vfs_lookup_data_t
 	for (unsigned int i = 0; i < testcase_count; i++) {
 		const struct vfs_lookup_data_t *testcase = &expected_outcome[i];
 		struct vfs_lookup_result_t result = { 0 };
+		test_debug("Testing lookup of: %s", testcase->input.path);
 		bool success = vfs_lookup(vfs, &result, testcase->input.path);
-		test_assert_int_eq(success, testcase->expect.success);
+		test_assert_bool_eq(success, testcase->expect.success);
 		if (success) {
+			if (is_testing_verbose()) {
+				vfs_dump_map_result(stderr, &result);
+			}
 			test_assert_int_eq(result.flags, testcase->expect.result.flags);
-			test_assert_str_eq(result.mountpoint->virtual_path, testcase->expect.result.mountpoint->virtual_path);
-			test_assert_int_eq(result.virtual_directory, testcase->expect.result.virtual_directory);
+			if (testcase->expect.result.mountpoint) {
+				test_assert(result.mountpoint != NULL);
+				test_assert_str_eq(result.mountpoint->virtual_path, testcase->expect.result.mountpoint->virtual_path);
+				test_assert_str_eq(result.mountpoint->target_path, testcase->expect.result.mountpoint->target_path);
+			}
+			test_assert_bool_eq(result.virtual_directory, testcase->expect.result.virtual_directory);
 		}
 	}
 }
@@ -63,14 +71,14 @@ void test_vfs_lookup(void) {
 	vfs_add_inode(vfs, "/", NULL, VFS_INODE_FLAG_READ_ONLY);
 	vfs_add_inode(vfs, "/pics/", "/home/joe/pics/", 0);
 	vfs_add_inode(vfs, "/pics/foo/neu/", NULL, 0);
-	vfs_add_inode(vfs, "/this/is/", NULL, VFS_INODE_FLAG_DISALLOW_CREATE_DIR | VFS_INODE_FLAG_READ_ONLY);
-	vfs_add_inode(vfs, "/this/is/deeply/nested/", "/home/joe/nested/", VFS_INODE_FLAG_READ_ONLY);
+	vfs_add_inode(vfs, "/this/is/", NULL, VFS_INODE_FLAG_DISALLOW_CREATE_DIR | VFS_INODE_FLAG_DISALLOW_UNLINK);
+	vfs_add_inode(vfs, "/this/is/deeply/nested/", "/home/joe/nested/", VFS_INODE_FLAG_ALLOW_SYMLINKS);
 	vfs_add_inode(vfs, "/zeug/", "/tmp/zeug/", 0);
 	vfs_add_inode(vfs, "/incoming/", "/tmp/write/", VFS_INODE_FLAG_DISALLOW_UNLINK);
-	fprintf(stderr, "=========================\n");
 	vfs_freeze_inodes(vfs);
-	vfs_dump(stderr, vfs);
-	printf("\n");
+	if (is_testing_verbose()) {
+		vfs_dump(stderr, vfs);
+	}
 
 
 	const struct vfs_lookup_data_t expected_outcome[] = {
@@ -78,8 +86,43 @@ void test_vfs_lookup(void) {
 			.input.path = "/",
 			.expect.success = true,
 			.expect.result.flags = VFS_INODE_FLAG_READ_ONLY,
-			.expect.result.mountpoint = &(struct vfs_inode_t){ .virtual_path = "/" },
+			.expect.result.mountpoint = NULL,
 			.expect.result.virtual_directory = true,
+		},
+		{
+			.input.path = "/pics/foo.jpg",
+			.expect.success = true,
+			.expect.result.flags = VFS_INODE_FLAG_READ_ONLY,
+			.expect.result.mountpoint = &(struct vfs_inode_t){ .virtual_path = "/pics", .target_path = "/home/joe/pics" },
+			.expect.result.virtual_directory = false,
+		},
+		{
+			.input.path = "/pics/x/y/z.jpg",
+			.expect.success = true,
+			.expect.result.flags = VFS_INODE_FLAG_READ_ONLY,
+			.expect.result.mountpoint = &(struct vfs_inode_t){ .virtual_path = "/pics", .target_path = "/home/joe/pics" },
+			.expect.result.virtual_directory = false,
+		},
+		{
+			.input.path = "/this",
+			.expect.success = true,
+			.expect.result.flags = VFS_INODE_FLAG_READ_ONLY,
+			.expect.result.mountpoint = NULL,
+			.expect.result.virtual_directory = true,
+		},
+		{
+			.input.path = "/incoming/foo/blubb.jpg",
+			.expect.success = true,
+			.expect.result.flags = VFS_INODE_FLAG_READ_ONLY | VFS_INODE_FLAG_DISALLOW_UNLINK,
+			.expect.result.mountpoint = &(struct vfs_inode_t){ .virtual_path = "/incoming", .target_path = "/tmp/write" },
+			.expect.result.virtual_directory = false,
+		},
+		{
+			.input.path = "/this/is/deeply/nested/blah/mookoo/xyz.jpg",
+			.expect.success = true,
+			.expect.result.flags = VFS_INODE_FLAG_READ_ONLY | VFS_INODE_FLAG_DISALLOW_UNLINK | VFS_INODE_FLAG_DISALLOW_CREATE_DIR | VFS_INODE_FLAG_DISALLOW_UNLINK | VFS_INODE_FLAG_ALLOW_SYMLINKS,
+			.expect.result.mountpoint = &(struct vfs_inode_t){ .virtual_path = "/this/is/deeply/nested", .target_path = "/home/joe/nested" },
+			.expect.result.virtual_directory = false,
 		}
 	};
 	verify_vfs_lookups(vfs, expected_outcome, sizeof(expected_outcome) / sizeof(struct vfs_lookup_data_t));

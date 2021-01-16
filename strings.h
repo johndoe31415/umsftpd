@@ -29,11 +29,13 @@
 typedef bool (*path_split_callback_t)(const char *path, bool is_full_path, void *vctx);
 
 /*************** AUTO GENERATED SECTION FOLLOWS ***************/
+void path_split_mutable(char *path, path_split_callback_t callback, void *vctx);
 void path_split(const char *path, path_split_callback_t callback, void *vctx);
 bool pathcmp(const char *path1, const char *path2);
 void truncate_trailing_slash(char *path);
 bool is_valid_path(const char *path);
 bool is_absolute_path(const char *path);
+void sanitize_path(char *path);
 /***************  AUTO GENERATED SECTION ENDS   ***************/
 
 #endif

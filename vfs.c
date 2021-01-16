@@ -43,7 +43,7 @@ struct vfs_inode_adding_ctx_t {
 	const char *leaf_target_path;
 };
 
-static void vfs_set_error(struct vfs_t *vfs, enum vfs_error_code_t error_code, const char *msg, ...) {
+static void vfs_set_error(struct vfs_t *vfs, enum vfs_internal_error_t error_code, const char *msg, ...) {
 	vfs->error.code = error_code;
 
 	va_list ap;

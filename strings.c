@@ -21,33 +21,40 @@
  *	Johannes Bauer <JohannesBauer@gmx.de>
 **/
 
+#include <stdio.h>
 #include <string.h>
 #include "strings.h"
+
+void path_split_mutable(char *path, path_split_callback_t callback, void *vctx) {
+	size_t len = strlen(path);
+	for (size_t i = 0; i < len; i++) {
+		bool is_full_path = (i == (len - 1));
+		bool do_continue = true;
+		if (path[i] == '/') {
+			if (i == 0) {
+				char saved = path[1];
+				path[1] = 0;
+				do_continue = callback(path, is_full_path, vctx);
+				path[1] = saved;
+			} else {
+				path[i] = 0;
+				do_continue = callback(path, is_full_path, vctx);
+				path[i] = '/';
+			}
+		} else if (is_full_path) {
+			callback(path, is_full_path, vctx);
+		}
+		if (!do_continue) {
+			break;
+		}
+	}
+}
 
 void path_split(const char *path, path_split_callback_t callback, void *vctx) {
 	size_t len = strlen(path);
 	char copy[len + 1];
 	strcpy(copy, path);
-
-	for (size_t i = 0; i < len; i++) {
-		bool is_full_path = (i == (len - 1));
-		if (copy[i] == '/') {
-			if (i == 0) {
-				char root[2] = "/";
-				if (!callback(root, is_full_path, vctx)) {
-					break;
-				}
-			} else {
-				copy[i] = 0;
-				if (!callback(copy, is_full_path, vctx)) {
-					break;
-				}
-				copy[i] = '/';
-			}
-		} else if (is_full_path) {
-			callback(copy, is_full_path, vctx);
-		}
-	}
+	path_split_mutable(copy, callback, vctx);
 }
 
 bool pathcmp(const char *path1, const char *path2) {
@@ -80,4 +87,21 @@ bool is_valid_path(const char *path) {
 
 bool is_absolute_path(const char *path) {
 	return path[0] == '/';
+}
+
+struct sanitize_path_ctx_t {
+	char *last;
+};
+
+static bool sanitize_path_callback(const char *path, bool is_full_path, void *vctx) {
+	struct sanitize_path_ctx_t *ctx = (struct sanitize_path_ctx_t*)vctx;
+	char *mpath = (char*)path;
+	ctx->last = mpath;
+	return true;
+}
+
+void sanitize_path(char *path) {
+	struct sanitize_path_ctx_t sanitize_path_ctx = { 0 };
+	path_split_mutable(path, sanitize_path_callback, &sanitize_path_ctx);
+
 }

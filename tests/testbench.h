@@ -41,20 +41,28 @@ struct testcase_t {
 	enum test_outcome_t outcome;
 };
 
+struct test_options_t {
+	unsigned int verbose;
+};
+
 typedef char* (*failfnc_t)(const void *lhs, const void *rhs);
 
 #define test_fail_if(cond)					if (cond) test_fail(__FILE__, __LINE__, __FUNCTION__, #cond " was true")
 #define test_fail_unless(cond)				if (!(cond)) test_fail(__FILE__, __LINE__, __FUNCTION__, #cond " was false")
 #define test_assert(cond)					test_fail_unless(cond)
-#define test_assert_str_eq(a, b)			{ const char *_a = (a); const char *_b = (b); if (strcmp(_a, _b)) test_fail_ext(__FILE__, __LINE__, __FUNCTION__, #a " != " #b, testbed_failfnc_str, _a, _b); }
+#define test_assert_str_eq(a, b)			{ const char *_a = (a); const char *_b = (b); if ((_a && _b && strcmp(_a, _b)) || ((_a == NULL) != (_b == NULL))) test_fail_ext(__FILE__, __LINE__, __FUNCTION__, #a " != " #b, testbed_failfnc_str, _a, _b); }
 #define test_assert_int_eq(a, b)			{ int _a = (a); int _b = (b); if (_a != _b) test_fail_ext(__FILE__, __LINE__, __FUNCTION__, #a " != " #b, testbed_failfnc_int, &_a, &_b); }
+#define test_assert_bool_eq(a, b)			{ int _a = (a); int _b = (b); if (_a != _b) test_fail_ext(__FILE__, __LINE__, __FUNCTION__, #a " != " #b, testbed_failfnc_bool, &_a, &_b); }
 #define test_assert_int_almost_eq(a, b, m)	{ int _a = (a); int _b = (b); int _m = (m); if ((_a < _b - _m) || (_a > _b + _m)) test_fail_ext(__FILE__, __LINE__, __FUNCTION__, #a " !≈ " #b " with error margin " #m, testbed_failfnc_int, &_a, &_b); }
 
 /*************** AUTO GENERATED SECTION FOLLOWS ***************/
+bool is_testing_verbose(void);
+void  __attribute__ ((format (printf, 1, 2))) test_debug(const char *msg, ...);
 void test_fail_ext(const char *file, int line, const char *fncname, const char *reason, failfnc_t failfnc, const void *lhs, const void *rhs);
 void test_fail(const char *file, int line, const char *fncname, const char *reason);
 char *testbed_failfnc_int(const void *vlhs, const void *vrhs);
 char *testbed_failfnc_str(const void *vlhs, const void *vrhs);
+char *testbed_failfnc_bool(const void *vlhs, const void *vrhs);
 void tests_run_all(struct testcase_t *testcases, unsigned int testcase_count);
 /***************  AUTO GENERATED SECTION ENDS   ***************/
 

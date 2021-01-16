@@ -25,12 +25,29 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <string.h>
+#include <stdarg.h>
 #include <sys/wait.h>
 #include <sys/types.h>
 #include <unistd.h>
 #include "testbench.h"
 
 static const char *current_testcase;
+static struct test_options_t current_options;
+
+bool is_testing_verbose(void) {
+	return current_options.verbose;
+}
+
+void  __attribute__ ((format (printf, 1, 2))) test_debug(const char *msg, ...) {
+	if (is_testing_verbose()) {
+		fprintf(stderr, "[%s] ", current_testcase);
+		va_list ap;
+		va_start(ap, msg);
+		vfprintf(stderr, msg, ap);
+		va_end(ap);
+		fprintf(stderr, "\n");
+	}
+}
 
 void test_fail_ext(const char *file, int line, const char *fncname, const char *reason, failfnc_t failfnc, const void *lhs, const void *rhs) {
 	fprintf(stderr, "FAILED %s %s:%d %s: %.80s\n", current_testcase, file, line, fncname, reason);
@@ -62,9 +79,18 @@ char *testbed_failfnc_str(const void *vlhs, const void *vrhs) {
 	return result;
 }
 
-static void test_run(struct testcase_t *testcase) {
+char *testbed_failfnc_bool(const void *vlhs, const void *vrhs) {
+	const bool lhs = *((const bool*)vlhs);
+	const bool rhs = *((const bool*)vrhs);
+	char *result = calloc(1, 32);
+	sprintf(result, "LHS = %s, RHS = %s", lhs ? "true" : "false", rhs ? "true" : "false");
+	return result;
+}
+
+static void test_run(struct testcase_t *testcase, const struct test_options_t *options) {
 	pid_t pid = fork();
 	current_testcase = testcase->name;
+	current_options = *options;
 	if (pid > 0) {
 		/* Parent, overwatch. */
 		int wstatus;
@@ -88,6 +114,16 @@ static void test_run(struct testcase_t *testcase) {
 
 void tests_run_all(struct testcase_t *testcases, unsigned int testcase_count) {
 	for (unsigned int i = 0; i < testcase_count; i++) {
-		test_run(&testcases[i]);
+		struct test_options_t options = {
+			.verbose = false,
+		};
+		test_run(&testcases[i], &options);
+		if (testcases[i].outcome == TEST_FAILED) {
+			/* Rerun verbosely */
+			fprintf(stderr, "====== Rerun of failed testcase: %s ====================================================\n", testcases[i].name);
+			options.verbose = true;
+			test_run(&testcases[i], &options);
+			fprintf(stderr, "========================================================================================\n");
+		}
 	}
 }

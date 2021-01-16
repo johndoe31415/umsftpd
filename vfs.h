@@ -37,6 +37,7 @@
 #define VFS_INODE_FLAG_DISALLOW_CREATE_FILE		(1 << 4)
 #define VFS_INODE_FLAG_DISALLOW_CREATE_DIR		(1 << 5)
 #define VFS_INODE_FLAG_DISALLOW_UNLINK			(1 << 6)
+#define VFS_INODE_FLAG_ALLOW_SYMLINKS			(1 << 7)
 
 struct vfs_inode_t {
 	struct vfs_inode_t *parent;
@@ -61,7 +62,7 @@ struct vfs_handle_t {
 	enum vfs_handle_type_t type;
 };
 
-enum vfs_error_code_t {
+enum vfs_internal_error_t {
 	VFS_ADD_INODE_PARAMETER_ERROR,
 	VFS_ADD_INODE_ALREADY_EXISTS,
 	VFS_ADD_INODE_OUT_OF_MEMORY,
@@ -72,10 +73,16 @@ enum vfs_error_code_t {
 	VFS_LOOKUP_NON_ABSOLUTE,
 };
 
+enum vfs_error_t {
+	VFS_OUT_OF_HANDLES,
+	VFS_PERMISSION_DENIED,
+	VFS_NO_SUCH_FILE_OR_DIRECTORY,
+};
+
 struct vfs_t {
 	struct {
 		char string[VFS_MAX_ERROR_LENGTH];
-		enum vfs_error_code_t code;
+		enum vfs_internal_error_t code;
 	} error;
 	struct {
 		unsigned int max_count;
