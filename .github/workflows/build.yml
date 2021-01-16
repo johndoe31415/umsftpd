@@ -10,7 +10,11 @@ jobs:
   build-libssh:
     runs-on: ubuntu-latest
     steps:
-      - run: git clone https://git.libssh.org/projects/libssh.git libssh
+      - run: git clone --depth 1 --branch libssh-0.9.5 https://git.libssh.org/projects/libssh.git libssh
+      - run: mkdir libssh-build
+      - run: cd libssh-build
+      - run: cmake ../libssh
+      - run: sudo make install
 
   build:
     needs: build-libssh
@@ -18,8 +22,8 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
-    - name: Install dependencies
-      run: sudo apt-get install libssh-dev
+#    - name: Install dependencies
+#      run: sudo apt-get install libssh-dev
     - name: make
       run: make
     - name: make tests
