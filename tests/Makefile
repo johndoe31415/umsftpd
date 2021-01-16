@@ -14,21 +14,18 @@ CFLAGS += -pie -fPIE -fsanitize=address -fsanitize=undefined -fsanitize=leak
 endif
 LDFLAGS :=
 
-TEST_COMMON_OBJS := testbench.o
+TEST_COMMON_OBJS := testbench.o testmain.o
 TEST_OBJS := \
 	test_strings \
 	test_vfs
 
 all: $(TEST_COMMON_OBJS) $(TEST_OBJS)
 
-test_strings: $(TEST_COMMON_OBJS) test_strings_main.o strings.o
-test_vfs: $(TEST_COMMON_OBJS) test_vfs_main.o vfs.o vfsdebug.o strings.o
+test_strings: $(TEST_COMMON_OBJS) test_strings_entry.o strings.o
+test_vfs: $(TEST_COMMON_OBJS) test_vfs_entry.o vfs.o vfsdebug.o strings.o
 
-test_strings_main.c: test_strings.c
-	./generate $< $@
-
-test_vfs_main.c: test_vfs.c
-	./generate $< $@
+%_entry.c: %.c
+	./generate_entry $< $@
 
 test: all
 	for testname in $(TEST_OBJS); do ./$$testname; done

@@ -46,7 +46,7 @@ template_vars = {
 }
 
 lookup = mako.lookup.TemplateLookup([ "." ], strict_undefined = True)
-template = lookup.get_template("testmain.c")
+template = lookup.get_template("entry_template.c")
 rendered = template.render(**template_vars)
 with open(args.outfile, "w") as f:
 	f.write(rendered)

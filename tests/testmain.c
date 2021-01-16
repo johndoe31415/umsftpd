@@ -24,27 +24,17 @@
 #include <stdio.h>
 #include "testbench.h"
 
-%for testcase in testcases:
-void ${testcase.function_name}(void);
-%endfor
-
-static const char *test_name = "${test_name}";
-static struct testcase_t testcases[] = {
-%for testcase in testcases:
-	{
-		.name = "${testcase.name}",
-		.entry = ${testcase.function_name},
-	},
-%endfor
-};
+/* These symbols are defined in the specific entry-file */
+extern const char *test_name;
+extern struct testcase_t testcases[];
+extern const unsigned int testcase_count;
 
 int main(int argc, char **argv) {
-	const unsigned int test_count = sizeof(testcases) / sizeof(struct testcase_t);
-	tests_run_all(testcases, test_count);
+	tests_run_all(testcases, testcase_count);
 
 	unsigned int pass_cnt = 0;
 	unsigned int fail_cnt = 0;
-	for (unsigned int i = 0; i < test_count; i++) {
+	for (unsigned int i = 0; i < testcase_count; i++) {
 		if (testcases[i].outcome == TEST_FAILED) {
 			fail_cnt++;
 		} else if (testcases[i].outcome == TEST_PASSED) {

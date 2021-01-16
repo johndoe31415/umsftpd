@@ -170,6 +170,7 @@ void test_sanitize_path(void) {
 		{ .cwd = "/moo", .path = "foo/bar/../..", .output = "/moo" },
 		{ .cwd = "/moo", .path = "foo/bar/../../..", .output = "/" },
 		{ .cwd = "/moo", .path = "foo/bar/../../../..", .output = "/" },
+		{ .cwd = "/", .path = "/a/b/c/d/../../../../..", .output = "/" },
 	};
 	const unsigned int testcase_count = sizeof(testcases) / sizeof(testcases[0]);
 	for (unsigned int i = 0; i < testcase_count; i++) {
