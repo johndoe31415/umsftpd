@@ -7,22 +7,19 @@ on:
     branches: [ master ]
 
 jobs:
-  build-libssh:
+  build:
     runs-on: ubuntu-latest
+
     steps:
-      - run: |
+    - uses: actions/checkout@v2
+
+    - name: Build libssh from Git
+      run: |
           git clone --depth 1 --branch libssh-0.9.5 https://git.libssh.org/projects/libssh.git libssh
           mkdir libssh-build
           cd libssh-build
           cmake ../libssh
           sudo make install
-
-  build:
-    needs: build-libssh
-    runs-on: ubuntu-latest
-
-    steps:
-    - uses: actions/checkout@v2
 #    - name: Install dependencies
 #      run: sudo apt-get install libssh-dev
     - name: make
