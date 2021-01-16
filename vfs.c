@@ -212,18 +212,17 @@ bool vfs_lookup(struct vfs_t *vfs, struct vfs_lookup_result_t *result, const cha
 	size_t len = strlen(path);
 	size_t total_len = len;
 
-	bool relative_path = (len == 0) || (path[0] != '/');
-	if (relative_path) {
+	bool absolute_path = is_absolute_path(path);
+	if (!absolute_path) {
 		total_len += vfs->cwd.length;
 	}
 
-	/* One character more than needed so we can append '/' */
-	char mpath[total_len + 1 + 1];
-	if (relative_path) {
+	char mpath[total_len + 1];
+	if (absolute_path) {
+		strcpy(mpath, path);
+	} else {
 		strcpy(mpath, vfs->cwd.path);
 		strcpy(mpath + vfs->cwd.length, path);
-	} else {
-		strcpy(mpath, path);
 	}
 
 	memset(result, 0, sizeof(*result));

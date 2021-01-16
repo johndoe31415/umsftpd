@@ -26,6 +26,7 @@
 
 void test_pathcmp(void);
 void test_path_split(void);
+void test_sanitize_path(void);
 
 static const char *test_name = "test_strings.c";
 static struct testcase_t testcases[] = {
@@ -36,6 +37,10 @@ static struct testcase_t testcases[] = {
 	{
 		.name = "path_split",
 		.entry = test_path_split,
+	},
+	{
+		.name = "sanitize_path",
+		.entry = test_sanitize_path,
 	},
 };
 

@@ -35,7 +35,7 @@ bool pathcmp(const char *path1, const char *path2);
 void truncate_trailing_slash(char *path);
 bool is_valid_path(const char *path);
 bool is_absolute_path(const char *path);
-void sanitize_path(char *path);
+char* sanitize_path(const char *cwd, const char *path);
 /***************  AUTO GENERATED SECTION ENDS   ***************/
 
 #endif

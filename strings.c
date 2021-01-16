@@ -22,6 +22,7 @@
 **/
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include "strings.h"
 
@@ -89,19 +90,68 @@ bool is_absolute_path(const char *path) {
 	return path[0] == '/';
 }
 
-struct sanitize_path_ctx_t {
-	char *last;
-};
+static char *sanitize_absolute_path(const char *path) {
+	if (!is_absolute_path(path)) {
+		return NULL;
+	}
 
-static bool sanitize_path_callback(const char *path, bool is_full_path, void *vctx) {
-	struct sanitize_path_ctx_t *ctx = (struct sanitize_path_ctx_t*)vctx;
-	char *mpath = (char*)path;
-	ctx->last = mpath;
-	return true;
+	int pathlen = strlen(path);
+	char *result = malloc(pathlen + 1);
+	if (!result) {
+		return NULL;
+	}
+
+	unsigned int result_len = 1;
+	result[0] = '/';
+
+	unsigned int token_len = 0;
+	const char *token = path + 1;
+	for (unsigned int i = 1; i < pathlen + 1; i++) {
+		char next_char = path[i];
+
+		if ((next_char == '/') || (next_char == 0)) {
+			//printf("Token: %20.*s (len %2d) ", token_len, token, token_len);
+			if ((token_len == 0) || (!strncmp(token, ".", token_len))) {
+				/* Entirely disregard this addition */
+			} else if (!strncmp(token, "..", token_len)) {
+				/* Backtrack! */
+				while ((result_len > 1) && (result[result_len - 1] != '/')) {
+					result_len--;
+				}
+				result_len--;
+				if (result_len == 0) {
+					/* Never cut out the initial '/' */
+					result_len = 1;
+				}
+			} else {
+				/* Just a regular appendage, copy over */
+				if (result[result_len - 1] != '/') {
+					result[result_len++] = '/';
+				}
+				memcpy(result + result_len, token, token_len);
+				result_len += token_len;
+			}
+			token = path + i + 1;
+			token_len = 0;
+			//printf("-> %.*s\n", result_len, result);
+		} else {
+			token_len++;
+		}
+	}
+	result[result_len] = 0;
+	return result;
 }
 
-void sanitize_path(char *path) {
-	struct sanitize_path_ctx_t sanitize_path_ctx = { 0 };
-	path_split_mutable(path, sanitize_path_callback, &sanitize_path_ctx);
-
+char* sanitize_path(const char *cwd, const char *path) {
+	if (!is_absolute_path(path)) {
+		int cwd_len = strlen(cwd);
+		int path_len = strlen(path);
+		char absolute_path[cwd_len + 1 + path_len + 1];
+		strcpy(absolute_path, cwd);
+		strcpy(absolute_path + cwd_len, "/");
+		strcpy(absolute_path + cwd_len + 1, path);
+		return sanitize_absolute_path(absolute_path);
+	} else {
+		return sanitize_absolute_path(path);
+	}
 }

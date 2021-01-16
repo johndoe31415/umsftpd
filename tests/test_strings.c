@@ -22,6 +22,7 @@
 **/
 
 #include <stdio.h>
+#include <stdlib.h>
 #include "strings.h"
 #include "test_strings.h"
 #include "testbench.h"
@@ -129,5 +130,53 @@ void test_path_split(void) {
 		struct pathsplit_t splitctx = { 0 };
 		path_split("", pathsplit_callback, &splitctx);
 		test_assert(splitctx.count == 0);
+	}
+}
+
+void test_sanitize_path(void) {
+	struct testcase_data_t {
+		const char *cwd;
+		const char *path;
+		const char *output;
+	} testcases[] = {
+		{ .cwd = "/", .path = "/this/is/an/example", .output = "/this/is/an/example" },
+		{ .cwd = "/", .path = "", .output = "/" },
+		{ .cwd = "/qwe", .path = "", .output = "/qwe" },
+		{ .cwd = "/", .path = "/", .output = "/" },
+		{ .cwd = "/", .path = "/foo", .output = "/foo" },
+		{ .cwd = "/", .path = "/foo/", .output = "/foo" },
+		{ .cwd = "/", .path = "/foo//", .output = "/foo" },
+		{ .cwd = "/", .path = "/foo//bar", .output = "/foo/bar" },
+		{ .cwd = "/", .path = "/foo//bar/../moo", .output = "/foo/moo" },
+		{ .cwd = "/", .path = "/foo//bar/../moo/./blubb", .output = "/foo/moo/blubb" },
+		{ .cwd = "/", .path = "/foo//bar/../moo/./blubb/../../../maeh", .output = "/maeh" },
+		{ .cwd = "/", .path = "/foo//bar/../moo/./blubb/../../../maeh/..", .output = "/" },
+		{ .cwd = "/", .path = "/foo//bar/../moo/./blubb/../../../maeh/../..", .output = "/" },
+		{ .cwd = "/", .path = "/foo//bar/../moo/./blubb/../../../maeh/../../../qwe", .output = "/qwe" },
+		{ .cwd = "/", .path = "foo", .output = "/foo" },
+		{ .cwd = "/", .path = "//foo", .output = "/foo" },
+		{ .cwd = "/", .path = "///foo", .output = "/foo" },
+		{ .cwd = "/", .path = "///./foo", .output = "/foo" },
+		{ .cwd = "/", .path = "///./.foo", .output = "/.foo" },
+		{ .cwd = "/", .path = "///./..foo", .output = "/..foo" },
+		{ .cwd = "/", .path = "foo///bar", .output = "/foo/bar" },
+		{ .cwd = "/", .path = "foo///bar/..", .output = "/foo" },
+		{ .cwd = "/", .path = "foo///bar/../..", .output = "/" },
+		{ .cwd = "/", .path = "foo///bar/../../..", .output = "/" },
+		{ .cwd = "/moo", .path = "foo", .output = "/moo/foo" },
+		{ .cwd = "/moo", .path = "/foo", .output = "/foo" },
+		{ .cwd = "/moo", .path = "foo/bar", .output = "/moo/foo/bar" },
+		{ .cwd = "/moo", .path = "foo/bar/..", .output = "/moo/foo" },
+		{ .cwd = "/moo", .path = "foo/bar/../..", .output = "/moo" },
+		{ .cwd = "/moo", .path = "foo/bar/../../..", .output = "/" },
+		{ .cwd = "/moo", .path = "foo/bar/../../../..", .output = "/" },
+	};
+	const unsigned int testcase_count = sizeof(testcases) / sizeof(testcases[0]);
+	for (unsigned int i = 0; i < testcase_count; i++) {
+		struct testcase_data_t *testcase = &testcases[i];
+		test_debug("Now checking: cwd '%s', path '%s'", testcase->cwd, testcase->path);
+		char *sanitized = sanitize_path(testcase->cwd, testcase->path);
+		test_assert_str_eq(sanitized, testcase->output);
+		free(sanitized);
 	}
 }
