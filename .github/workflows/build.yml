@@ -11,11 +11,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: |
-        git clone --depth 1 --branch libssh-0.9.5 https://git.libssh.org/projects/libssh.git libssh
-        mkdir libssh-build
-        cd libssh-build
-        cmake ../libssh
-        sudo make install
+          git clone --depth 1 --branch libssh-0.9.5 https://git.libssh.org/projects/libssh.git libssh
+          mkdir libssh-build
+          cd libssh-build
+          cmake ../libssh
+          sudo make install
 
   build:
     needs: build-libssh
