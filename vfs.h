@@ -74,6 +74,10 @@ enum vfs_internal_error_t {
 	VFS_SANITIZE_PATH_ERROR,
 	VFS_INODE_LOOKUP_ERROR,
 	VFS_PATH_MAP_ERROR,
+	VFS_MISSING_ARGUMENT,
+	VFS_NOT_MOUNTED,
+	VFS_PATH_NOT_ABSOLUTE,
+	VFS_OUT_OF_MEMORY,
 };
 
 enum vfs_error_t {
@@ -85,6 +89,9 @@ enum vfs_error_t {
 };
 
 struct vfs_t {
+	struct {
+		unsigned int verbosity;
+	} settings;
 	struct {
 		char string[VFS_MAX_ERROR_LENGTH];
 		enum vfs_internal_error_t code;
@@ -114,6 +121,7 @@ struct vfs_t *vfs_init(void);
 void vfs_handle_free(struct vfs_handle_t *handle);
 void vfs_free(struct vfs_t *vfs);
 enum vfs_error_t vfs_opendir(struct vfs_t *vfs, const char *path, struct vfs_handle_t **handle_ptr);
+void vfs_close_handle(struct vfs_handle_t *handle);
 /***************  AUTO GENERATED SECTION ENDS   ***************/
 
 #endif

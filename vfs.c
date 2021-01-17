@@ -50,6 +50,10 @@ static void vfs_set_error(struct vfs_t *vfs, enum vfs_internal_error_t error_cod
 	va_start(ap, msg);
 	vsnprintf(vfs->error.string, VFS_MAX_ERROR_LENGTH - 1, msg, ap);
 	va_end(ap);
+
+	if (vfs->settings.verbosity >= 2) {
+		fprintf(stderr, "vfs error %d: %s\n", vfs->error.code, vfs->error.string);
+	}
 }
 
 static struct vfs_inode_t *vfs_find_inode(struct vfs_t *vfs, const char *virtual_path) {
@@ -135,8 +139,8 @@ static struct vfs_inode_t* vfs_add_single_inode(struct vfs_t *vfs, const char *v
 	new_inode->reset_flags = reset_flags;
 	new_inode->virtual_path = vpath_copy;
 	new_inode->target_path = tpath_copy;
-	new_inode->vlen = strlen(virtual_path);
-	new_inode->tlen = target_path ? strlen(target_path) : 0;
+	new_inode->vlen = strlen(vpath_copy);
+	new_inode->tlen = target_path ? strlen(tpath_copy) : 0;
 
 	struct vfs_inode_t **new_inodes = realloc(vfs->inode.data, sizeof(struct vfs_inode_t*) * (vfs->inode.count + 1));
 	if (!new_inodes) {
@@ -286,8 +290,45 @@ void vfs_free(struct vfs_t *vfs) {
 	free(vfs);
 }
 
-static char *vfs_map_path(const struct vfs_lookup_result_t *lookup, const char *virtual_path) {
-	return NULL;
+static char *vfs_map_path(struct vfs_t *vfs, const struct vfs_lookup_result_t *lookup, const char *virtual_path) {
+	if (!lookup) {
+		vfs_set_error(vfs, VFS_MISSING_ARGUMENT, "vfs_map_path() recevied NULL lookup");
+		return NULL;
+	}
+	if (!virtual_path) {
+		vfs_set_error(vfs, VFS_MISSING_ARGUMENT, "vfs_map_path() recevied NULL virtual_path");
+		return NULL;
+	}
+	if (!is_absolute_path(virtual_path)) {
+		vfs_set_error(vfs, VFS_PATH_NOT_ABSOLUTE, "vfs_map_path() recevied non-absolute virtual_path");
+		return NULL;
+	}
+	if (!lookup->mountpoint) {
+		vfs_set_error(vfs, VFS_NOT_MOUNTED, "vfs_map_path() has non-mounted lookup");
+		return NULL;
+	}
+
+	size_t virtual_path_length = strlen(virtual_path);
+	if (virtual_path_length < lookup->mountpoint->vlen + 1) {
+		vfs_set_error(vfs, VFS_ILLEGAL_PATH, "vfs_map_path() has received shorter virtual path than mountpoint; something is wrong.");
+		return NULL;
+	}
+	const char *virtual_path_suffix = virtual_path + lookup->mountpoint->vlen + 1;
+	size_t suffix_length = virtual_path_length - lookup->mountpoint->vlen - 1;
+
+	size_t memory_requirement = lookup->mountpoint->tlen + 1 + suffix_length + 1;
+	char *result = malloc(memory_requirement);
+	if (!result) {
+		vfs_set_error(vfs, VFS_OUT_OF_MEMORY, "vfs_map_path() could not allocate memory for mapped path");
+		return NULL;
+	}
+
+	memcpy(result, lookup->mountpoint->target_path, lookup->mountpoint->tlen);
+	result[lookup->mountpoint->tlen] = '/';
+	memcpy(result + lookup->mountpoint->tlen + 1, virtual_path_suffix, suffix_length);
+	result[lookup->mountpoint->tlen + 1 + suffix_length] = 0;
+
+	return result;
 }
 
 enum vfs_error_t vfs_opendir(struct vfs_t *vfs, const char *path, struct vfs_handle_t **handle_ptr) {
@@ -331,14 +372,30 @@ enum vfs_error_t vfs_opendir(struct vfs_t *vfs, const char *path, struct vfs_han
 		}
 	}
 
-	char *mapped_path = vfs_map_path(&lookup, virtual_path);
+	char *mapped_path = vfs_map_path(vfs, &lookup, virtual_path);
 	if (!mapped_path) {
 		free(virtual_path);
 		vfs_set_error(vfs, VFS_PATH_MAP_ERROR, "vfs_opendir() could not map path successfully");
 		return VFS_INTERNAL_ERROR;
 	}
 
+
+	struct vfs_handle_t *handle = calloc(1, sizeof(struct vfs_handle_t));
+	if (!handle) {
+		free(mapped_path);
+		free(virtual_path);
+		vfs_set_error(vfs, VFS_OUT_OF_MEMORY, "vfs_opendir() could not allocate handle memory");
+		return VFS_INTERNAL_ERROR;
+	}
+	*handle_ptr = handle;
+
+
+
 	free(mapped_path);
 	free(virtual_path);
 	return VFS_OK;
+}
+
+void vfs_close_handle(struct vfs_handle_t *handle) {
+	free(handle);
 }

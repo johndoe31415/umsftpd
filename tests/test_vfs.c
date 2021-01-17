@@ -157,3 +157,20 @@ void test_vfs_ro_root(void) {
 
 	vfs_free(vfs);
 }
+
+void test_vfs_opendir(void) {
+	struct vfs_t *vfs = vfs_init();
+
+	vfs_add_inode(vfs, "/", "/tmp", VFS_INODE_FLAG_READ_ONLY, 0);
+	vfs_freeze_inodes(vfs);
+
+	struct vfs_handle_t *handle = NULL;
+	enum vfs_error_t result = vfs_opendir(vfs, "/foo/.fhud/../../subdir", &handle);
+	if (result != VFS_OK) {
+		test_debug("VFS error %d: %s", vfs->error.code, vfs->error.string);
+	}
+	test_assert_int_eq(result, VFS_OK);
+	test_assert(handle);
+	vfs_close_handle(handle);
+	vfs_free(vfs);
+}

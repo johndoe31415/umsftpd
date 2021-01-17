@@ -28,6 +28,7 @@
 void test_empty_vfs(void);
 void test_vfs_lookup(void);
 void test_vfs_ro_root(void);
+void test_vfs_opendir(void);
 /***************  AUTO GENERATED SECTION ENDS   ***************/
 
 #endif
