@@ -73,6 +73,7 @@ enum vfs_internal_error_t {
 	VFS_ILLEGAL_PATH,
 	VFS_SANITIZE_PATH_ERROR,
 	VFS_INODE_LOOKUP_ERROR,
+	VFS_PATH_MAP_ERROR,
 };
 
 enum vfs_error_t {

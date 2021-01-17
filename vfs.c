@@ -286,6 +286,10 @@ void vfs_free(struct vfs_t *vfs) {
 	free(vfs);
 }
 
+static char *vfs_map_path(const struct vfs_lookup_result_t *lookup, const char *virtual_path) {
+	return NULL;
+}
+
 enum vfs_error_t vfs_opendir(struct vfs_t *vfs, const char *path, struct vfs_handle_t **handle_ptr) {
 	*handle_ptr = NULL;
 	if (!path) {
@@ -310,6 +314,11 @@ enum vfs_error_t vfs_opendir(struct vfs_t *vfs, const char *path, struct vfs_han
 		return VFS_INTERNAL_ERROR;
 	}
 
+	if (!lookup.mountpoint) {
+		free(virtual_path);
+		return VFS_NO_SUCH_FILE_OR_DIRECTORY;
+	}
+
 	if (lookup.flags & VFS_INODE_FLAG_FILTER_ALL) {
 		free(virtual_path);
 		return VFS_NO_SUCH_FILE_OR_DIRECTORY;
@@ -322,7 +331,14 @@ enum vfs_error_t vfs_opendir(struct vfs_t *vfs, const char *path, struct vfs_han
 		}
 	}
 
+	char *mapped_path = vfs_map_path(&lookup, virtual_path);
+	if (!mapped_path) {
+		free(virtual_path);
+		vfs_set_error(vfs, VFS_PATH_MAP_ERROR, "vfs_opendir() could not map path successfully");
+		return VFS_INTERNAL_ERROR;
+	}
 
+	free(mapped_path);
 	free(virtual_path);
 	return VFS_OK;
 }
