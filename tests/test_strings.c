@@ -181,3 +181,34 @@ void test_sanitize_path(void) {
 		free(sanitized);
 	}
 }
+
+void test_path_contains_hidden(void) {
+	struct testcase_data_t {
+		const char *path;
+		bool contains_hidden;
+	} testcases[] = {
+		{ .path = "/", .contains_hidden = false },
+		{ .path = "/a", .contains_hidden = false },
+		{ .path = "/a/", .contains_hidden = false },
+		{ .path = "/a/b/c/d", .contains_hidden = false },
+		{ .path = "/foo", .contains_hidden = false },
+		{ .path = "/this/is/an/example", .contains_hidden = false },
+		{ .path = "/a./b./c./d.", .contains_hidden = false },
+		{ .path = "/foo.txt", .contains_hidden = false },
+		{ .path = "/this/is/an/example.pdf", .contains_hidden = false },
+		{ .path = "/.a", .contains_hidden = true },
+		{ .path = "/.a/", .contains_hidden = true },
+		{ .path = "/a/.b/c/d", .contains_hidden = true },
+		{ .path = "/foo/.bar", .contains_hidden = true },
+		{ .path = "/this/is/.an/example", .contains_hidden = true },
+		{ .path = "/.this/is/an/example", .contains_hidden = true },
+		{ .path = "/this/is/an/example/.x", .contains_hidden = true },
+	};
+	const unsigned int testcase_count = sizeof(testcases) / sizeof(testcases[0]);
+	for (unsigned int i = 0; i < testcase_count; i++) {
+		struct testcase_data_t *testcase = &testcases[i];
+		test_debug("Now checking: path '%s'", testcase->path);
+		bool result = path_contains_hidden(testcase->path);
+		test_assert_bool_eq(result, testcase->contains_hidden);
+	}
+}

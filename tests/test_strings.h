@@ -28,6 +28,7 @@
 void test_pathcmp(void);
 void test_path_split(void);
 void test_sanitize_path(void);
+void test_path_contains_hidden(void);
 /***************  AUTO GENERATED SECTION ENDS   ***************/
 
 #endif

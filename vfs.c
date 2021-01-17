@@ -303,13 +303,24 @@ enum vfs_error_t vfs_opendir(struct vfs_t *vfs, const char *path, struct vfs_han
 		return VFS_INTERNAL_ERROR;
 	}
 
-	struct vfs_lookup_result_t result;
-	if (!vfs_lookup(vfs, &result, virtual_path)) {
+	struct vfs_lookup_result_t lookup;
+	if (!vfs_lookup(vfs, &lookup, virtual_path)) {
 		free(virtual_path);
 		vfs_set_error(vfs, VFS_INODE_LOOKUP_ERROR, "vfs_opendir() could not lookup path successfully");
 		return VFS_INTERNAL_ERROR;
 	}
 
+	if (lookup.flags & VFS_INODE_FLAG_FILTER_ALL) {
+		free(virtual_path);
+		return VFS_NO_SUCH_FILE_OR_DIRECTORY;
+	}
+
+	if (lookup.flags & VFS_INODE_FLAG_FILTER_HIDDEN) {
+		if (path_contains_hidden(virtual_path)) {
+			free(virtual_path);
+			return VFS_NO_SUCH_FILE_OR_DIRECTORY;
+		}
+	}
 
 
 	free(virtual_path);

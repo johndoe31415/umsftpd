@@ -36,6 +36,7 @@ void truncate_trailing_slash(char *path);
 bool is_valid_path(const char *path);
 bool is_absolute_path(const char *path);
 char* sanitize_path(const char *cwd, const char *path);
+bool path_contains_hidden(const char *path);
 /***************  AUTO GENERATED SECTION ENDS   ***************/
 
 #endif

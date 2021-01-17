@@ -155,3 +155,22 @@ char* sanitize_path(const char *cwd, const char *path) {
 		return sanitize_absolute_path(path);
 	}
 }
+
+/* Functions only on sanitized paths, i.e, '/foo/./bar' or '/foo/..' will show
+ * up as 'hidden'. */
+bool path_contains_hidden(const char *path) {
+	bool seen_slash = true;
+	while (*path) {
+		char next_char = *path;
+		if (next_char == '/') {
+			seen_slash = true;
+		} else {
+			if (seen_slash && (next_char == '.')) {
+				return true;
+			}
+			seen_slash = false;
+		}
+		path++;
+	}
+	return false;
+}
