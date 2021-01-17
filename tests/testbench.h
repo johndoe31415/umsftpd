@@ -54,6 +54,8 @@ typedef char* (*failfnc_t)(const void *lhs, const void *rhs);
 #define test_assert_int_eq(a, b)			{ int _a = (a); int _b = (b); if (_a != _b) test_fail_ext(__FILE__, __LINE__, __FUNCTION__, #a " != " #b, testbed_failfnc_int, &_a, &_b); }
 #define test_assert_bool_eq(a, b)			{ int _a = (a); int _b = (b); if (_a != _b) test_fail_ext(__FILE__, __LINE__, __FUNCTION__, #a " != " #b, testbed_failfnc_bool, &_a, &_b); }
 #define test_assert_int_almost_eq(a, b, m)	{ int _a = (a); int _b = (b); int _m = (m); if ((_a < _b - _m) || (_a > _b + _m)) test_fail_ext(__FILE__, __LINE__, __FUNCTION__, #a " !≈ " #b " with error margin " #m, testbed_failfnc_int, &_a, &_b); }
+#define test_assert_true(a)					test_assert_bool_eq((a), true)
+#define test_assert_false(a)				test_assert_bool_eq((a), false)
 
 /*************** AUTO GENERATED SECTION FOLLOWS ***************/
 bool is_testing_verbose(void);

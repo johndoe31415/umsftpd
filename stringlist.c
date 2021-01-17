@@ -31,6 +31,7 @@ struct stringlist_t* stringlist_new(void) {
 	if (!list) {
 		return NULL;
 	}
+	list->sorted = true;
 	return list;
 }
 
@@ -49,7 +50,23 @@ bool stringlist_insert(struct stringlist_t *list, const char *string) {
 	list->strings = list_realloced;
 	list->count++;
 	list->strings[list->count - 1] = str_copy;
+	list->sorted = false;
 	return true;
+}
+
+static int stringlist_cmp(const void *vstrptr1, const void *vstrptr2) {
+	const char **strptr1 = (const char**)vstrptr1;
+	const char **strptr2 = (const char**)vstrptr2;
+	const char *str1 = *strptr1;
+	const char *str2 = *strptr2;
+	return strcmp(str1, str2);
+}
+
+void stringlist_sort(struct stringlist_t *list) {
+	if (list->count) {
+		qsort(list->strings, list->count, sizeof(char*), stringlist_cmp);
+		list->sorted = true;
+	}
 }
 
 void stringlist_free(struct stringlist_t *list) {

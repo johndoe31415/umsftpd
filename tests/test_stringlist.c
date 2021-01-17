@@ -29,10 +29,12 @@
 void test_stringlist_create_destroy(void) {
 	struct stringlist_t* list = stringlist_new();
 	test_assert(list);
+	test_assert_true(list->sorted);
+	test_assert_int_eq(list->count, 0);
 	stringlist_free(list);
 }
 
-void test_stringlist_use(void) {
+void test_stringlist_insert(void) {
 	struct stringlist_t* list = stringlist_new();
 	test_assert(list);
 	test_assert_int_eq(list->count, 0);
@@ -42,5 +44,18 @@ void test_stringlist_use(void) {
 	stringlist_insert(list, "bar");
 	test_assert_int_eq(list->count, 2);
 	test_assert_str_eq(list->strings[1], "bar");
+	stringlist_free(list);
+}
+
+void test_stringlist_sort(void) {
+	struct stringlist_t* list = stringlist_new();
+	stringlist_insert(list, "foo");
+	test_assert_false(list->sorted);
+	stringlist_insert(list, "bar");
+	test_assert_int_eq(list->count, 2);
+	stringlist_sort(list);
+	test_assert_true(list->sorted);
+	test_assert_str_eq(list->strings[0], "bar");
+	test_assert_str_eq(list->strings[1], "foo");
 	stringlist_free(list);
 }

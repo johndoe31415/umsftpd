@@ -29,11 +29,13 @@
 struct stringlist_t {
 	unsigned int count;
 	char **strings;
+	bool sorted;
 };
 
 /*************** AUTO GENERATED SECTION FOLLOWS ***************/
 struct stringlist_t* stringlist_new(void);
 bool stringlist_insert(struct stringlist_t *list, const char *string);
+void stringlist_sort(struct stringlist_t *list);
 void stringlist_free(struct stringlist_t *list);
 /***************  AUTO GENERATED SECTION ENDS   ***************/
 
