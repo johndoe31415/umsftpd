@@ -26,6 +26,8 @@
 
 #include <stdio.h>
 #include <stdbool.h>
+#include <sys/types.h>
+#include <dirent.h>
 #include "stringlist.h"
 
 #define VFS_MAX_ERROR_LENGTH					64
@@ -59,6 +61,11 @@ enum vfs_handle_type_t {
 
 struct vfs_handle_t {
 	enum vfs_handle_type_t type;
+	union {
+		struct {
+			DIR *dir;
+		} dir;
+	};
 };
 
 enum vfs_internal_error_t {
@@ -78,6 +85,7 @@ enum vfs_internal_error_t {
 	VFS_NOT_MOUNTED,
 	VFS_PATH_NOT_ABSOLUTE,
 	VFS_OUT_OF_MEMORY,
+	VFS_OPENDIR_FAILED,
 };
 
 enum vfs_error_t {

@@ -350,8 +350,8 @@ enum vfs_error_t vfs_opendir(struct vfs_t *vfs, const char *path, struct vfs_han
 
 	struct vfs_lookup_result_t lookup;
 	if (!vfs_lookup(vfs, &lookup, virtual_path)) {
-		free(virtual_path);
 		vfs_set_error(vfs, VFS_INODE_LOOKUP_ERROR, "vfs_opendir() could not lookup path successfully");
+		free(virtual_path);
 		return VFS_INTERNAL_ERROR;
 	}
 
@@ -374,22 +374,36 @@ enum vfs_error_t vfs_opendir(struct vfs_t *vfs, const char *path, struct vfs_han
 
 	char *mapped_path = vfs_map_path(vfs, &lookup, virtual_path);
 	if (!mapped_path) {
-		free(virtual_path);
 		vfs_set_error(vfs, VFS_PATH_MAP_ERROR, "vfs_opendir() could not map path successfully");
+		free(virtual_path);
 		return VFS_INTERNAL_ERROR;
 	}
 
+	DIR *dir = opendir(mapped_path);
+	if (!dir) {
+		vfs_set_error(vfs, VFS_OPENDIR_FAILED, "vfs_opendir() failed to call opendir(3): %s", strerror(errno));
+		free(mapped_path);
+		free(virtual_path);
+		if (errno == EACCES) {
+			return VFS_PERMISSION_DENIED;
+		} else if (errno == ENOENT) {
+			return VFS_NO_SUCH_FILE_OR_DIRECTORY;
+		} else {
+			return VFS_INTERNAL_ERROR;
+		}
+	}
 
 	struct vfs_handle_t *handle = calloc(1, sizeof(struct vfs_handle_t));
 	if (!handle) {
+		vfs_set_error(vfs, VFS_OUT_OF_MEMORY, "vfs_opendir() could not allocate handle memory");
+		closedir(dir);
 		free(mapped_path);
 		free(virtual_path);
-		vfs_set_error(vfs, VFS_OUT_OF_MEMORY, "vfs_opendir() could not allocate handle memory");
 		return VFS_INTERNAL_ERROR;
 	}
 	*handle_ptr = handle;
-
-
+	handle->type = DIR_HANDLE;
+	handle->dir.dir = dir;
 
 	free(mapped_path);
 	free(virtual_path);
@@ -397,5 +411,8 @@ enum vfs_error_t vfs_opendir(struct vfs_t *vfs, const char *path, struct vfs_han
 }
 
 void vfs_close_handle(struct vfs_handle_t *handle) {
+	if (handle->type == DIR_HANDLE) {
+		closedir(handle->dir.dir);
+	}
 	free(handle);
 }

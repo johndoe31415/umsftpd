@@ -22,6 +22,7 @@
 **/
 
 #include <stdio.h>
+#include <sys/stat.h>
 #include "testbench.h"
 #include "vfs.h"
 #include "vfsdebug.h"
@@ -159,13 +160,15 @@ void test_vfs_ro_root(void) {
 }
 
 void test_vfs_opendir(void) {
+	mkdir("/tmp/umsftpd_test", 0755);
+
 	struct vfs_t *vfs = vfs_init();
 
 	vfs_add_inode(vfs, "/", "/tmp", VFS_INODE_FLAG_READ_ONLY, 0);
 	vfs_freeze_inodes(vfs);
 
 	struct vfs_handle_t *handle = NULL;
-	enum vfs_error_t result = vfs_opendir(vfs, "/foo/.fhud/../../subdir", &handle);
+	enum vfs_error_t result = vfs_opendir(vfs, "/foo/.fhud/../../umsftpd_test", &handle);
 	if (result != VFS_OK) {
 		test_debug("VFS error %d: %s", vfs->error.code, vfs->error.string);
 	}
