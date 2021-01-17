@@ -24,9 +24,6 @@
 #include "vfsdebug.h"
 
 static void vfs_dump_flags(FILE *f, unsigned int flags) {
-	if (flags & VFS_INODE_FLAG_RESET) {
-		fprintf(f, " RESET");
-	}
 	if (flags & VFS_INODE_FLAG_READ_ONLY) {
 		fprintf(f, " READ_ONLY");
 	}
@@ -52,9 +49,11 @@ static void vfs_dump_inode_target(FILE *f, const struct vfs_inode_t *inode) {
 	if (inode->target_path) {
 		fprintf(f, " => %s", inode->target_path);
 	}
-	if (inode->flags) {
-		fprintf(f, " [flags: 0x%x ", inode->flags);
-		vfs_dump_flags(f, inode->flags);
+	if (inode->set_flags || inode->reset_flags) {
+		fprintf(f, " [set = 0x%x ", inode->set_flags);
+		vfs_dump_flags(f, inode->set_flags);
+		fprintf(f, ", reset = 0x%x ", inode->reset_flags);
+		vfs_dump_flags(f, inode->reset_flags);
 		fprintf(f, "]");
 	}
 }

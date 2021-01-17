@@ -68,13 +68,13 @@ static void verify_vfs_lookups(struct vfs_t *vfs, const struct vfs_lookup_data_t
 void test_vfs_lookup(void) {
 	struct vfs_t *vfs = vfs_init();
 
-	vfs_add_inode(vfs, "/", NULL, VFS_INODE_FLAG_READ_ONLY);
-	vfs_add_inode(vfs, "/pics/", "/home/joe/pics/", 0);
-	vfs_add_inode(vfs, "/pics/foo/neu/", NULL, 0);
-	vfs_add_inode(vfs, "/this/is/", NULL, VFS_INODE_FLAG_DISALLOW_CREATE_DIR | VFS_INODE_FLAG_DISALLOW_UNLINK);
-	vfs_add_inode(vfs, "/this/is/deeply/nested/", "/home/joe/nested/", VFS_INODE_FLAG_ALLOW_SYMLINKS);
-	vfs_add_inode(vfs, "/zeug/", "/tmp/zeug/", 0);
-	vfs_add_inode(vfs, "/incoming/", "/tmp/write/", VFS_INODE_FLAG_DISALLOW_UNLINK);
+	vfs_add_inode(vfs, "/", NULL, VFS_INODE_FLAG_READ_ONLY, 0);
+	vfs_add_inode(vfs, "/pics/", "/home/joe/pics/", 0, 0);
+	vfs_add_inode(vfs, "/pics/foo/neu/", NULL, 0, 0);
+	vfs_add_inode(vfs, "/this/is/", NULL, VFS_INODE_FLAG_DISALLOW_CREATE_DIR | VFS_INODE_FLAG_DISALLOW_UNLINK, 0);
+	vfs_add_inode(vfs, "/this/is/deeply/nested/", "/home/joe/nested/", VFS_INODE_FLAG_ALLOW_SYMLINKS, 0);
+	vfs_add_inode(vfs, "/zeug/", "/tmp/zeug/", 0, 0);
+	vfs_add_inode(vfs, "/incoming/", "/tmp/write/", VFS_INODE_FLAG_DISALLOW_UNLINK, 0);
 	vfs_freeze_inodes(vfs);
 	if (is_testing_verbose()) {
 		vfs_dump(stderr, vfs);
@@ -152,8 +152,8 @@ void test_vfs_lookup(void) {
 void test_vfs_ro_root(void) {
 	struct vfs_t *vfs = vfs_init();
 
-	vfs_add_inode(vfs, "/", NULL, VFS_INODE_FLAG_READ_ONLY);
-	vfs_add_inode(vfs, "/pics/", "/home/joe/pics/", 0);
+	vfs_add_inode(vfs, "/", NULL, VFS_INODE_FLAG_READ_ONLY, 0);
+	vfs_add_inode(vfs, "/pics/", "/home/joe/pics/", 0, 0);
 
 	vfs_free(vfs);
 }

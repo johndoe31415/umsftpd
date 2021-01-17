@@ -30,18 +30,17 @@
 
 #define VFS_MAX_ERROR_LENGTH					64
 
-#define VFS_INODE_FLAG_RESET					(1 << 0)
-#define VFS_INODE_FLAG_READ_ONLY				(1 << 1)
-#define VFS_INODE_FLAG_FILTER_ALL				(1 << 2)
-#define VFS_INODE_FLAG_FILTER_HIDDEN			(1 << 3)
-#define VFS_INODE_FLAG_DISALLOW_CREATE_FILE		(1 << 4)
-#define VFS_INODE_FLAG_DISALLOW_CREATE_DIR		(1 << 5)
-#define VFS_INODE_FLAG_DISALLOW_UNLINK			(1 << 6)
-#define VFS_INODE_FLAG_ALLOW_SYMLINKS			(1 << 7)
+#define VFS_INODE_FLAG_READ_ONLY				(1 << 0)
+#define VFS_INODE_FLAG_FILTER_ALL				(1 << 1)
+#define VFS_INODE_FLAG_FILTER_HIDDEN			(1 << 2)
+#define VFS_INODE_FLAG_DISALLOW_CREATE_FILE		(1 << 3)
+#define VFS_INODE_FLAG_DISALLOW_CREATE_DIR		(1 << 4)
+#define VFS_INODE_FLAG_DISALLOW_UNLINK			(1 << 5)
+#define VFS_INODE_FLAG_ALLOW_SYMLINKS			(1 << 6)
 
 struct vfs_inode_t {
 	struct vfs_inode_t *parent;
-	unsigned int flags;
+	unsigned int set_flags, reset_flags;
 	char *virtual_path;
 	char *target_path;
 	size_t vlen, tlen;
@@ -71,12 +70,17 @@ enum vfs_internal_error_t {
 	VFS_INODE_FINALIZATION_ERROR,
 	VFS_CWD_ILLEGAL,
 	VFS_LOOKUP_NON_ABSOLUTE,
+	VFS_ILLEGAL_PATH,
+	VFS_SANITIZE_PATH_ERROR,
+	VFS_INODE_LOOKUP_ERROR,
 };
 
 enum vfs_error_t {
+	VFS_OK,
 	VFS_OUT_OF_HANDLES,
 	VFS_PERMISSION_DENIED,
 	VFS_NO_SUCH_FILE_OR_DIRECTORY,
+	VFS_INTERNAL_ERROR,
 };
 
 struct vfs_t {
@@ -85,6 +89,7 @@ struct vfs_t {
 		enum vfs_internal_error_t code;
 	} error;
 	struct {
+		unsigned int current_count;
 		unsigned int max_count;
 	} handles;
 	struct {
@@ -101,13 +106,13 @@ struct vfs_t {
 };
 
 /*************** AUTO GENERATED SECTION FOLLOWS ***************/
-bool vfs_add_inode(struct vfs_t *vfs, const char *virtual_path, const char *target_path, unsigned int flags);
+bool vfs_add_inode(struct vfs_t *vfs, const char *virtual_path, const char *target_path, unsigned int set_flags, unsigned int reset_flags);
 bool vfs_lookup(struct vfs_t *vfs, struct vfs_lookup_result_t *result, const char *path);
 void vfs_freeze_inodes(struct vfs_t *vfs);
-struct vfs_handle_t* vfs_opendir(const struct vfs_t *vfs, const char *virtual_path);
 struct vfs_t *vfs_init(void);
 void vfs_handle_free(struct vfs_handle_t *handle);
 void vfs_free(struct vfs_t *vfs);
+enum vfs_error_t vfs_opendir(struct vfs_t *vfs, const char *path, struct vfs_handle_t **handle_ptr);
 /***************  AUTO GENERATED SECTION ENDS   ***************/
 
 #endif
