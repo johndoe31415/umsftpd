@@ -21,41 +21,12 @@
  *	Johannes Bauer <JohannesBauer@gmx.de>
 **/
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include "stringlist.h"
+#ifndef __TEST_STRINGLIST_H__
+#define __TEST_STRINGLIST_H__
 
-struct stringlist_t* stringlist_new(void) {
-	struct stringlist_t *list = calloc(1, sizeof(struct stringlist_t));
-	if (!list) {
-		return NULL;
-	}
-	return list;
-}
+/*************** AUTO GENERATED SECTION FOLLOWS ***************/
+void test_stringlist_create_destroy(void);
+void test_stringlist_use(void);
+/***************  AUTO GENERATED SECTION ENDS   ***************/
 
-bool stringlist_insert(struct stringlist_t *list, const char *string) {
-	char *str_copy = strdup(string);
-	if (!str_copy) {
-		return false;
-	}
-
-	char **list_realloced = realloc(list->strings, sizeof(char*) * (list->count + 1));
-	if (!list_realloced) {
-		free(str_copy);
-		return false;
-	}
-
-	list->strings = list_realloced;
-	list->count++;
-	list->strings[list->count - 1] = str_copy;
-	return true;
-}
-
-void stringlist_free(struct stringlist_t *list) {
-	for (unsigned int i = 0; i < list->count; i++) {
-		free(list->strings[i]);
-	}
-	free(list->strings);
-	free(list);
-}
+#endif

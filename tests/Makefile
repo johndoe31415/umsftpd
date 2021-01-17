@@ -8,11 +8,13 @@ LDFLAGS :=
 
 TEST_COMMON_OBJS := testbench.o testmain.o
 TEST_OBJS := \
+	test_stringlist \
 	test_strings \
 	test_vfs
 
 all: $(TEST_COMMON_OBJS) $(TEST_OBJS)
 
+test_stringlist: $(TEST_COMMON_OBJS) test_stringlist_entry.o stringlist.o
 test_strings: $(TEST_COMMON_OBJS) test_strings_entry.o strings.o
 test_vfs: $(TEST_COMMON_OBJS) test_vfs_entry.o vfs.o vfsdebug.o strings.o
 

@@ -22,40 +22,25 @@
 **/
 
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+#include "testbench.h"
 #include "stringlist.h"
+#include "test_stringlist.h"
 
-struct stringlist_t* stringlist_new(void) {
-	struct stringlist_t *list = calloc(1, sizeof(struct stringlist_t));
-	if (!list) {
-		return NULL;
-	}
-	return list;
+void test_stringlist_create_destroy(void) {
+	struct stringlist_t* list = stringlist_new();
+	test_assert(list);
+	stringlist_free(list);
 }
 
-bool stringlist_insert(struct stringlist_t *list, const char *string) {
-	char *str_copy = strdup(string);
-	if (!str_copy) {
-		return false;
-	}
-
-	char **list_realloced = realloc(list->strings, sizeof(char*) * (list->count + 1));
-	if (!list_realloced) {
-		free(str_copy);
-		return false;
-	}
-
-	list->strings = list_realloced;
-	list->count++;
-	list->strings[list->count - 1] = str_copy;
-	return true;
-}
-
-void stringlist_free(struct stringlist_t *list) {
-	for (unsigned int i = 0; i < list->count; i++) {
-		free(list->strings[i]);
-	}
-	free(list->strings);
-	free(list);
+void test_stringlist_use(void) {
+	struct stringlist_t* list = stringlist_new();
+	test_assert(list);
+	test_assert_int_eq(list->count, 0);
+	stringlist_insert(list, "foo");
+	test_assert_int_eq(list->count, 1);
+	test_assert_str_eq(list->strings[0], "foo");
+	stringlist_insert(list, "bar");
+	test_assert_int_eq(list->count, 2);
+	test_assert_str_eq(list->strings[1], "bar");
+	stringlist_free(list);
 }
