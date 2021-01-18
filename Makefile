@@ -1,7 +1,7 @@
-.PHONY: test pgmopts install vfstest tests
+.PHONY: test pgmopts install vfsshell tests
 
-CFLAGS := -O3 -std=c11 -D_POSIX_C_SOURCE=200112L -D_XOPEN_SOURCE=500 -march=native
-CFLAGS += -Wall -Wmissing-prototypes -Wstrict-prototypes -Werror=implicit-function-declaration -Werror=format -Wshadow -Wswitch -pthread
+CFLAGS := -O3 -std=c11 -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=500 -D_DEFAULT_SOURCE -march=native
+CFLAGS += -Wall -Wmissing-prototypes -Wstrict-prototypes -Werror=implicit-function-declaration -Wno-stringop-truncation -Werror=format -Wshadow -Wswitch -pthread
 CFLAGS += -DDEBUG -ggdb3 -pie -fPIE -fsanitize=address -fsanitize=undefined -fsanitize=leak
 CFLAGS += -DWITH_SERVER
 
@@ -15,19 +15,19 @@ OBJS := \
 	stringlist.o \
 	strings.o
 
-BINARIES := umsftpd vfstest
+BINARIES := umsftpd vfsshell
 
 all: umsftpd
 
 tests:
-	make -C tests test
+	make -C tests tests
 
 umsftpd: $(OBJS)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
-vfstest: vfs.c stringlist.c strings.c vfsdebug.c
-	$(CC) $(CFLAGS) -D__VFS_TEST__ -o $@ $^ $(LDFLAGS)
-	./vfstest
+vfsshell: vfs.c stringlist.c strings.c vfsdebug.c logging.c
+	$(CC) $(CFLAGS) -D__VFS_SHELL__ -o $@ $^ $(LDFLAGS)
+	./vfsshell
 
 clean:
 	rm -f $(OBJS)

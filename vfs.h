@@ -25,12 +25,15 @@
 #define __VFS_H__
 
 #include <stdio.h>
+#include <stdint.h>
 #include <stdbool.h>
 #include <sys/types.h>
+#include <time.h>
 #include <dirent.h>
 #include "stringlist.h"
 
 #define VFS_MAX_ERROR_LENGTH					64
+#define VFS_MAX_FILENAME_LENGTH					256
 
 #define VFS_INODE_FLAG_READ_ONLY				(1 << 0)
 #define VFS_INODE_FLAG_FILTER_ALL				(1 << 1)
@@ -57,15 +60,33 @@ struct vfs_lookup_result_t {
 enum vfs_handle_type_t {
 	FILE_HANDLE,
 	DIR_HANDLE,
+	VIRTUAL_DIR_HANDLE,
 };
 
 struct vfs_handle_t {
 	enum vfs_handle_type_t type;
+	bool virtual_directory;
+	char *virtual_path;
+	char *mapped_path;
+	unsigned int flags;
 	union {
 		struct {
 			DIR *dir;
 		} dir;
+		struct {
+			const struct vfs_inode_t *inode;
+		} virtual_dir;
 	};
+};
+
+struct vfs_dirent_t {
+	char filename[VFS_MAX_FILENAME_LENGTH];
+	bool eof;
+	bool is_file;
+	uint16_t uid, gid;
+	uint64_t filesize;
+	uint16_t permissions;
+	struct timespec mtime, ctime, atime;
 };
 
 enum vfs_internal_error_t {
@@ -98,9 +119,6 @@ enum vfs_error_t {
 
 struct vfs_t {
 	struct {
-		unsigned int verbosity;
-	} settings;
-	struct {
 		char string[VFS_MAX_ERROR_LENGTH];
 		enum vfs_internal_error_t code;
 	} error;
@@ -122,13 +140,15 @@ struct vfs_t {
 };
 
 /*************** AUTO GENERATED SECTION FOLLOWS ***************/
+const char *vfs_error_str(enum vfs_error_t error_code);
 bool vfs_add_inode(struct vfs_t *vfs, const char *virtual_path, const char *target_path, unsigned int set_flags, unsigned int reset_flags);
 bool vfs_lookup(struct vfs_t *vfs, struct vfs_lookup_result_t *result, const char *path);
 void vfs_freeze_inodes(struct vfs_t *vfs);
 struct vfs_t *vfs_init(void);
-void vfs_handle_free(struct vfs_handle_t *handle);
 void vfs_free(struct vfs_t *vfs);
+enum vfs_error_t vfs_chdir(struct vfs_t *vfs, const char *path);
 enum vfs_error_t vfs_opendir(struct vfs_t *vfs, const char *path, struct vfs_handle_t **handle_ptr);
+enum vfs_error_t vfs_readdir(struct vfs_handle_t *handle, struct vfs_dirent_t *vfs_dirent);
 void vfs_close_handle(struct vfs_handle_t *handle);
 /***************  AUTO GENERATED SECTION ENDS   ***************/
 

@@ -24,6 +24,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <errno.h>
+
 #include "strings.h"
 
 void path_split_mutable(char *path, path_split_callback_t callback, void *vctx) {
@@ -173,4 +178,44 @@ bool path_contains_hidden(const char *path) {
 		path++;
 	}
 	return false;
+}
+
+static bool path_contains_symlink_callback(const char *path, bool is_full_path, void *vctx) {
+	struct symlink_check_response_t *ctx = (struct symlink_check_response_t*)vctx;
+	struct stat statbuf;
+	if (lstat(path, &statbuf)) {
+		/* Stat failed */
+		if (errno == ENOENT) {
+			ctx->file_not_found = true;
+		} else {
+			ctx->critical_error = true;
+		}
+	} else {
+		/* Stat successful, have symlink? */
+		if (S_ISLNK(statbuf.st_mode)) {
+			ctx->contains_symlink = true;
+		}
+	}
+	/* Continue only if no error and no symlink seen so far */
+	return (!ctx->file_not_found) && (!ctx->critical_error) && (!ctx->contains_symlink);
+}
+
+struct symlink_check_response_t path_contains_symlink(const char *path) {
+	struct symlink_check_response_t result = {
+		.critical_error = false,
+		.file_not_found = false,
+		.contains_symlink = false,
+	};
+	path_split(path, path_contains_symlink_callback, &result);
+	return result;
+}
+
+void strip_crlf(char *string) {
+	int len = strlen(string);
+	if (len && (string[len - 1] == '\n')) {
+		string[--len] = 0;
+	}
+	if (len && (string[len - 1] == '\r')) {
+		string[--len] = 0;
+	}
 }

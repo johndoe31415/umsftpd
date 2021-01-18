@@ -26,10 +26,17 @@
 #include <stdarg.h>
 #include <string.h>
 #include <errno.h>
+#include <dirent.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <fcntl.h>
 
 #include "vfs.h"
 #include "logging.h"
 #include "strings.h"
+
+static struct vfs_inode_t* vfs_add_single_inode(struct vfs_t *vfs, const char *virtual_path, const char *target_path, unsigned int set_flags, unsigned int reset_flags, struct vfs_inode_t *parent);
 
 struct vfs_lookup_traversal_t {
 	struct vfs_t *vfs;
@@ -43,6 +50,22 @@ struct vfs_inode_adding_ctx_t {
 	const char *leaf_target_path;
 };
 
+struct vfs_validate_constraints_ctx_t {
+	bool constraints_fulfilled;
+	unsigned int flags;
+};
+
+const char *vfs_error_str(enum vfs_error_t error_code) {
+	switch (error_code) {
+		case VFS_OK: return "success";
+		case VFS_OUT_OF_HANDLES: return "out of handles";
+		case VFS_PERMISSION_DENIED: return "permission denied";
+		case VFS_NO_SUCH_FILE_OR_DIRECTORY: return "no such file or directory";
+		case VFS_INTERNAL_ERROR: return "internal error";
+	}
+	return "unknown error";
+}
+
 static void vfs_set_error(struct vfs_t *vfs, enum vfs_internal_error_t error_code, const char *msg, ...) {
 	vfs->error.code = error_code;
 
@@ -51,9 +74,7 @@ static void vfs_set_error(struct vfs_t *vfs, enum vfs_internal_error_t error_cod
 	vsnprintf(vfs->error.string, VFS_MAX_ERROR_LENGTH - 1, msg, ap);
 	va_end(ap);
 
-	if (vfs->settings.verbosity >= 2) {
-		fprintf(stderr, "vfs error %d: %s\n", vfs->error.code, vfs->error.string);
-	}
+	logmsg(LLVL_ERROR, "VFS error %d: %s", vfs->error.code, vfs->error.string);
 }
 
 static struct vfs_inode_t *vfs_find_inode(struct vfs_t *vfs, const char *virtual_path) {
@@ -90,8 +111,6 @@ static bool vfs_set_cwd(struct vfs_t *vfs, const char *new_cwd) {
 	truncate_trailing_slash(vfs->cwd.path);
 	return true;
 }
-
-static struct vfs_inode_t* vfs_add_single_inode(struct vfs_t *vfs, const char *virtual_path, const char *target_path, unsigned int set_flags, unsigned int reset_flags, struct vfs_inode_t *parent);
 
 static bool vfs_add_inode_splitter(const char *path, bool is_full_path, void *vctx) {
 	struct vfs_inode_adding_ctx_t *ctx = (struct vfs_inode_adding_ctx_t*)vctx;
@@ -272,10 +291,6 @@ struct vfs_t *vfs_init(void) {
 	return vfs;
 }
 
-void vfs_handle_free(struct vfs_handle_t *handle) {
-	free(handle);
-}
-
 void vfs_free(struct vfs_t *vfs) {
 	if (!vfs) {
 		return;
@@ -331,88 +346,223 @@ static char *vfs_map_path(struct vfs_t *vfs, const struct vfs_lookup_result_t *l
 	return result;
 }
 
-enum vfs_error_t vfs_opendir(struct vfs_t *vfs, const char *path, struct vfs_handle_t **handle_ptr) {
+static enum vfs_error_t vfs_open_node(struct vfs_t *vfs, const char *path, struct vfs_handle_t **handle_ptr) {
 	*handle_ptr = NULL;
+
 	if (!path) {
 		vfs_set_error(vfs, VFS_ILLEGAL_PATH, "vfs_opendir() recevied NULL path");
 		return VFS_INTERNAL_ERROR;
 	}
 
 	if (vfs->handles.current_count >= vfs->handles.max_count) {
+		logmsg(LLVL_ERROR, "vfs_open_node() ran out of handles (%d maximum).", vfs->handles.max_count);
 		return VFS_OUT_OF_HANDLES;
-	}
-
-	char *virtual_path = sanitize_path(vfs->cwd.path, path);
-	if (!virtual_path) {
-		vfs_set_error(vfs, VFS_SANITIZE_PATH_ERROR, "vfs_opendir() could not sanitize path successfully");
-		return VFS_INTERNAL_ERROR;
-	}
-
-	struct vfs_lookup_result_t lookup;
-	if (!vfs_lookup(vfs, &lookup, virtual_path)) {
-		vfs_set_error(vfs, VFS_INODE_LOOKUP_ERROR, "vfs_opendir() could not lookup path successfully");
-		free(virtual_path);
-		return VFS_INTERNAL_ERROR;
-	}
-
-	if (!lookup.mountpoint) {
-		free(virtual_path);
-		return VFS_NO_SUCH_FILE_OR_DIRECTORY;
-	}
-
-	if (lookup.flags & VFS_INODE_FLAG_FILTER_ALL) {
-		free(virtual_path);
-		return VFS_NO_SUCH_FILE_OR_DIRECTORY;
-	}
-
-	if (lookup.flags & VFS_INODE_FLAG_FILTER_HIDDEN) {
-		if (path_contains_hidden(virtual_path)) {
-			free(virtual_path);
-			return VFS_NO_SUCH_FILE_OR_DIRECTORY;
-		}
-	}
-
-	char *mapped_path = vfs_map_path(vfs, &lookup, virtual_path);
-	if (!mapped_path) {
-		vfs_set_error(vfs, VFS_PATH_MAP_ERROR, "vfs_opendir() could not map path successfully");
-		free(virtual_path);
-		return VFS_INTERNAL_ERROR;
-	}
-
-	DIR *dir = opendir(mapped_path);
-	if (!dir) {
-		vfs_set_error(vfs, VFS_OPENDIR_FAILED, "vfs_opendir() failed to call opendir(3): %s", strerror(errno));
-		free(mapped_path);
-		free(virtual_path);
-		if (errno == EACCES) {
-			return VFS_PERMISSION_DENIED;
-		} else if (errno == ENOENT) {
-			return VFS_NO_SUCH_FILE_OR_DIRECTORY;
-		} else {
-			return VFS_INTERNAL_ERROR;
-		}
 	}
 
 	struct vfs_handle_t *handle = calloc(1, sizeof(struct vfs_handle_t));
 	if (!handle) {
 		vfs_set_error(vfs, VFS_OUT_OF_MEMORY, "vfs_opendir() could not allocate handle memory");
-		closedir(dir);
-		free(mapped_path);
-		free(virtual_path);
 		return VFS_INTERNAL_ERROR;
 	}
-	*handle_ptr = handle;
-	handle->type = DIR_HANDLE;
-	handle->dir.dir = dir;
 
-	free(mapped_path);
-	free(virtual_path);
+	handle->virtual_path = sanitize_path(vfs->cwd.path, path);
+	if (!handle->virtual_path) {
+		vfs_set_error(vfs, VFS_SANITIZE_PATH_ERROR, "vfs_opendir() could not sanitize path successfully");
+		vfs_close_handle(handle);
+		return VFS_INTERNAL_ERROR;
+	}
+
+	struct vfs_lookup_result_t lookup;
+	if (!vfs_lookup(vfs, &lookup, handle->virtual_path)) {
+		vfs_set_error(vfs, VFS_INODE_LOOKUP_ERROR, "vfs_opendir() could not lookup path successfully");
+		vfs_close_handle(handle);
+		return VFS_INTERNAL_ERROR;
+	}
+
+	handle->virtual_directory = lookup.virtual_directory;
+	handle->flags = lookup.flags;
+
+	if (lookup.flags & VFS_INODE_FLAG_FILTER_ALL) {
+		logmsg(LLVL_DEBUG, "vfs_open_node() returning 'no such file or directory' because virtual path \"%s\" is filtered.", handle->virtual_path);
+		vfs_close_handle(handle);
+		return VFS_NO_SUCH_FILE_OR_DIRECTORY;
+	}
+
+	if (lookup.flags & VFS_INODE_FLAG_FILTER_HIDDEN) {
+		if (path_contains_hidden(handle->virtual_path)) {
+			logmsg(LLVL_DEBUG, "vfs_open_node() returning 'permission denied' because virtual path \"%s\" contains hidden elements.", handle->virtual_path);
+			vfs_close_handle(handle);
+			return VFS_PERMISSION_DENIED;
+		}
+	}
+
+	if ((!handle->virtual_directory) && (!lookup.mountpoint)) {
+		logmsg(LLVL_DEBUG, "vfs_open_node() returning 'no such file or directory' because no mountpoint exists for \"%s\".", handle->virtual_path);
+		vfs_close_handle(handle);
+		return VFS_NO_SUCH_FILE_OR_DIRECTORY;
+	}
+
+	if (lookup.mountpoint) {
+		handle->mapped_path = vfs_map_path(vfs, &lookup, handle->virtual_path);
+		if (!handle->mapped_path) {
+			vfs_set_error(vfs, VFS_PATH_MAP_ERROR, "vfs_opendir() could not map path successfully");
+			vfs_close_handle(handle);
+			return VFS_INTERNAL_ERROR;
+		}
+
+		if (!(lookup.flags & VFS_INODE_FLAG_ALLOW_SYMLINKS)) {
+			struct symlink_check_response_t symlink = path_contains_symlink(handle->mapped_path);
+			if (symlink.critical_error) {
+				/* Error checking for symlinks, better reject */
+				logmsg(LLVL_ERROR, "vfs_open_node() failed to check symlinks of %s: %s", handle->mapped_path, strerror(errno));
+				vfs_close_handle(handle);
+				return VFS_INTERNAL_ERROR;
+			}
+			if (symlink.contains_symlink) {
+				/* Symlinks disallowed, but somewhere in real path symlinks are
+				 * present -> pretend this node does not exist */
+				logmsg(LLVL_DEBUG, "vfs_open_node() returning 'no such file or directory' because disallowed symlinks present in \"%s\".", handle->virtual_path);
+				vfs_close_handle(handle);
+				return VFS_NO_SUCH_FILE_OR_DIRECTORY;
+			}
+		}
+	}
+
+	*handle_ptr = handle;
 	return VFS_OK;
 }
 
+static enum vfs_error_t vfs_errno_to_vfs_error(int errnum) {
+	switch (errnum) {
+		case EACCES:
+			return VFS_PERMISSION_DENIED;
+
+		case ENOENT:
+			return VFS_NO_SUCH_FILE_OR_DIRECTORY;
+
+		default:
+			return VFS_INTERNAL_ERROR;
+	}
+}
+
+enum vfs_error_t vfs_chdir(struct vfs_t *vfs, const char *path) {
+	struct vfs_handle_t *handle;
+	enum vfs_error_t result = vfs_open_node(vfs, path, &handle);
+	if (result != VFS_OK) {
+		return result;
+	}
+
+	if (handle->virtual_directory) {
+		/* We always allow chdir to a virtual directory */
+		bool success = vfs_set_cwd(vfs, handle->virtual_path);
+		vfs_close_handle(handle);
+		return success ? VFS_OK : VFS_INTERNAL_ERROR;
+	} else {
+		logmsg(LLVL_CRITICAL, "vfs_chdir() not implemented TODO");
+	}
+
+
+	vfs_close_handle(handle);
+	return VFS_OK;
+}
+
+enum vfs_error_t vfs_opendir(struct vfs_t *vfs, const char *path, struct vfs_handle_t **handle_ptr) {
+	enum vfs_error_t result = vfs_open_node(vfs, path, handle_ptr);
+	if (result != VFS_OK) {
+		return result;
+	}
+
+	struct vfs_handle_t *handle = *handle_ptr;
+	handle->type = DIR_HANDLE;
+
+	handle->dir.dir = opendir(handle->mapped_path);
+	if (!handle->dir.dir) {
+		vfs_set_error(vfs, VFS_OPENDIR_FAILED, "vfs_opendir() failed to call opendir(3): %s", strerror(errno));
+		vfs_close_handle(handle);
+		return vfs_errno_to_vfs_error(errno);
+	}
+
+	return VFS_OK;
+}
+
+enum vfs_error_t vfs_readdir(struct vfs_handle_t *handle, struct vfs_dirent_t *vfs_dirent) {
+	if (handle->type != DIR_HANDLE) {
+		logmsg(LLVL_WARN, "vfs_readdir() got invalid handle type %u", handle->type);
+		return VFS_INTERNAL_ERROR;
+	}
+
+	/* TODO: return internal nodes first */
+
+	while (true) {
+		errno = 0;
+		struct dirent *dirent = readdir(handle->dir.dir);
+		if ((dirent == NULL) && (errno != 0)) {
+			/* An error occurred while trying to read the directory */
+			logmsg(LLVL_ERROR, "vfs_readdir() encountered an error while trying to read directory: %s", strerror(errno));
+			return VFS_INTERNAL_ERROR;
+		}
+
+		if (dirent == NULL) {
+			vfs_dirent->eof = true;
+			return VFS_OK;
+		}
+
+		if ((dirent->d_type != DT_REG) && (dirent->d_type != DT_DIR) && (dirent->d_type != DT_LNK)) {
+			/* No need to stat if there's a file node which we do not support
+			 * at all. */
+			continue;
+		}
+
+		/* TODO: filter names of internal nodes */
+
+		strncpy(vfs_dirent->filename, dirent->d_name, VFS_MAX_FILENAME_LENGTH);
+		vfs_dirent->filename[VFS_MAX_FILENAME_LENGTH - 1] = 0;
+
+		errno = 0;
+		struct stat statbuf;
+		int stat_result = fstatat(dirfd(handle->dir.dir), vfs_dirent->filename, &statbuf, 0);
+		if (stat_result == -1) {
+			/* Possibly truncated filename, hence ENOENT. Also could be missing
+			 * permissions. In either case, do not return the node if we're not
+			 * allowed to stat it. */
+			logmsg(LLVL_WARN, "vfs_readdir() encountered error in fstatat: %s", strerror(errno));
+			continue;
+		}
+
+		unsigned int file_type = statbuf.st_mode & S_IFMT;
+		if ((file_type != S_IFDIR) && (file_type != S_IFREG)) {
+			/* Special file (block device, char device, FIFO, unknown) */
+			continue;
+		}
+
+		vfs_dirent->eof = false;
+		vfs_dirent->is_file = (file_type == S_IFREG);
+		vfs_dirent->uid = statbuf.st_uid;
+		vfs_dirent->gid = statbuf.st_gid;
+		vfs_dirent->filesize = statbuf.st_size;
+		vfs_dirent->permissions = statbuf.st_mode & (S_IRWXU | S_IRWXG | S_IRWXO);
+		if (handle->flags & VFS_INODE_FLAG_READ_ONLY) {
+			/* Strip write permission flags if read-only handle */
+			vfs_dirent->permissions &= ~(S_IWUSR | S_IWGRP | S_IWOTH);
+		}
+		vfs_dirent->mtime = statbuf.st_mtim;
+		vfs_dirent->ctime = statbuf.st_ctim;
+		vfs_dirent->atime = statbuf.st_atim;
+
+		return VFS_OK;
+	}
+}
+
 void vfs_close_handle(struct vfs_handle_t *handle) {
+	if (!handle) {
+		return;
+	}
+	free(handle->mapped_path);
+	free(handle->virtual_path);
 	if (handle->type == DIR_HANDLE) {
-		closedir(handle->dir.dir);
+		if (handle->dir.dir) {
+			closedir(handle->dir.dir);
+		}
 	}
 	free(handle);
 }

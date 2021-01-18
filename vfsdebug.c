@@ -21,6 +21,9 @@
  *	Johannes Bauer <JohannesBauer@gmx.de>
 **/
 
+#include <string.h>
+#include <sys/stat.h>
+#include "strings.h"
 #include "vfsdebug.h"
 
 static void vfs_dump_flags(FILE *f, unsigned int flags) {
@@ -88,3 +91,123 @@ void vfs_dump_map_result(FILE *f, const struct vfs_lookup_result_t *map_result) 
 	}
 	fprintf(f, "Virtual directory: %s\n", map_result->virtual_directory ? "yes" : "no");
 }
+
+static void vfs_shell_ls_printent_color(const struct vfs_dirent_t *vfs_dirent, bool start) {
+	unsigned int color = 0;
+	if (!vfs_dirent->is_file) {
+		color = 4;		/* directory, blue */
+	} else if (vfs_dirent->permissions & (S_IXUSR | S_IXGRP | S_IXOTH)) {
+		color = 2;		/* executable, green */
+	}
+	if (color) {
+		if (start) {
+			printf("\e[01;3%dm", color);
+		} else {
+			printf("\e[0m");
+		}
+	}
+}
+
+static void vfs_shell_ls_printent(const struct vfs_dirent_t *vfs_dirent) {
+	printf("%s", vfs_dirent->is_file ? "-" : "d");
+	for (unsigned int bit = 9; bit > 0; bit -= 3) {
+		printf("%s%s%s", ((vfs_dirent->permissions >> (bit - 1)) & 1) ? "r" : "-", ((vfs_dirent->permissions >> (bit - 2)) & 1) ? "w" : "-", ((vfs_dirent->permissions >> (bit - 3)) & 1) ? "x" : "-");
+	}
+
+	printf("   %4d %4d", vfs_dirent->uid, vfs_dirent->gid);
+	printf("   %8lu", vfs_dirent->filesize);
+
+	struct tm time_struct;
+	localtime_r(&vfs_dirent->mtime.tv_sec, &time_struct);
+	char time_format[64];
+	strftime(time_format, sizeof(time_format), "%Y-%m-%d %H:%M:%S", &time_struct);
+	printf("  %s", time_format);
+
+	printf("  ");
+	vfs_shell_ls_printent_color(vfs_dirent, true);
+	printf("%s", vfs_dirent->filename);
+	vfs_shell_ls_printent_color(vfs_dirent, false);
+	printf("\n");
+}
+
+static void vfs_shell_ls(struct vfs_t *vfs, const char *path) {
+	struct vfs_handle_t *handle;
+	enum vfs_error_t result = vfs_opendir(vfs, path, &handle);
+	if (result != VFS_OK) {
+		fprintf(stderr, "diropen %s: %s\n", path, vfs_error_str(result));
+		return;
+	}
+
+	struct vfs_dirent_t vfs_dirent;
+	while (true) {
+		result = vfs_readdir(handle, &vfs_dirent);
+		if (result != VFS_OK) {
+			fprintf(stderr, "vfs_readdir %s: %s\n", path, vfs_error_str(result));
+			break;
+		}
+		if (vfs_dirent.eof) {
+			break;
+		}
+		vfs_shell_ls_printent(&vfs_dirent);
+	}
+
+	vfs_close_handle(handle);
+}
+
+void vfs_shell(struct vfs_t *vfs) {
+	while (true) {
+		printf("vfs [");
+		printf("%s", (vfs->cwd.path[0] == 0) ? "/" : vfs->cwd.path);
+		printf("]: ");
+		fflush(stdout);
+
+		char line[256];
+		if (!fgets(line, sizeof(line) - 1, stdin)) {
+			return;
+		}
+		strip_crlf(line);
+
+		char *command = strtok(line, " ");
+		if (!command) {
+			continue;
+		} else if (!strcmp(command, "ls")) {
+			char *path = strtok(NULL, " ");
+			if (!path) {
+				vfs_shell_ls(vfs, ".");
+			} else {
+				vfs_shell_ls(vfs, path);
+			}
+		} else if (!strcmp(command, "cd")) {
+			char *path = strtok(NULL, " ");
+			if (!path) {
+				printf("Error: 'cd' command requires path as argument\n");
+			} else {
+				enum vfs_error_t result = vfs_chdir(vfs, path);
+				if (result != VFS_OK) {
+					printf("Error: %s\n", vfs_error_str(result));
+				}
+			}
+		} else if (!strcmp(command, "cat")) {
+		} else if (!strcmp(command, "put")) {
+		} else if (!strcmp(command, "?") || !strcmp(command, "help")) {
+		} else {
+			printf("Unknown command: %s\n", command);
+		}
+	}
+}
+
+#ifdef __VFS_SHELL__
+#include "logging.h"
+
+int main(int argc, char **argv) {
+	llvl_set(LLVL_TRACE);
+
+	struct vfs_t *vfs = vfs_init();
+	vfs_add_inode(vfs, "/", "/tmp", VFS_INODE_FLAG_READ_ONLY, 0);
+	vfs_add_inode(vfs, "/virt", NULL, VFS_INODE_FLAG_READ_ONLY, 0);
+	vfs_freeze_inodes(vfs);
+	vfs_shell(vfs);
+	vfs_free(vfs);
+	return 0;
+}
+#endif

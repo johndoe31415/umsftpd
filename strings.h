@@ -28,6 +28,12 @@
 
 typedef bool (*path_split_callback_t)(const char *path, bool is_full_path, void *vctx);
 
+struct symlink_check_response_t {
+	bool critical_error;
+	bool file_not_found;
+	bool contains_symlink;
+};
+
 /*************** AUTO GENERATED SECTION FOLLOWS ***************/
 void path_split_mutable(char *path, path_split_callback_t callback, void *vctx);
 void path_split(const char *path, path_split_callback_t callback, void *vctx);
@@ -37,6 +43,8 @@ bool is_valid_path(const char *path);
 bool is_absolute_path(const char *path);
 char* sanitize_path(const char *cwd, const char *path);
 bool path_contains_hidden(const char *path);
+struct symlink_check_response_t path_contains_symlink(const char *path);
+void strip_crlf(char *string);
 /***************  AUTO GENERATED SECTION ENDS   ***************/
 
 #endif
