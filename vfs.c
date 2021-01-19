@@ -36,6 +36,12 @@
 #include "logging.h"
 #include "strings.h"
 
+static const char *mode_string_mapping[] = {
+	[FILEMODE_READ] = "r",
+	[FILEMODE_WRITE] = "w",
+	[FILEMODE_APPEND] = "a",
+};
+
 static struct vfs_inode_t* vfs_add_single_inode(struct vfs_t *vfs, const char *virtual_path, const char *target_path, unsigned int set_flags, unsigned int reset_flags, struct vfs_inode_t *parent);
 
 struct vfs_lookup_traversal_t {
@@ -62,6 +68,9 @@ const char *vfs_error_str(enum vfs_error_t error_code) {
 		case VFS_PERMISSION_DENIED: return "permission denied";
 		case VFS_NO_SUCH_FILE_OR_DIRECTORY: return "no such file or directory";
 		case VFS_INTERNAL_ERROR: return "internal error";
+		case VFS_NOT_A_DIRECTORY: return "not a directory";
+		case VFS_NOT_A_FILE: return "not a file";
+		case VFS_IO_ERROR: return "I/O error";
 	}
 	return "unknown error";
 }
@@ -153,6 +162,10 @@ static struct vfs_inode_t* vfs_add_single_inode(struct vfs_t *vfs, const char *v
 		vfs_set_error(vfs, VFS_ADD_INODE_OUT_OF_MEMORY, "error creating inode (%s)", strerror(errno));
 		return NULL;
 	}
+	if (parent) {
+		const char *virt_basename = const_basename(vpath_copy);
+		stringlist_insert(parent->virtual_subdirs, virt_basename);
+	}
 	new_inode->parent = parent;
 	new_inode->set_flags = set_flags;
 	new_inode->reset_flags = reset_flags;
@@ -160,6 +173,7 @@ static struct vfs_inode_t* vfs_add_single_inode(struct vfs_t *vfs, const char *v
 	new_inode->target_path = tpath_copy;
 	new_inode->vlen = strlen(vpath_copy);
 	new_inode->tlen = target_path ? strlen(tpath_copy) : 0;
+	new_inode->virtual_subdirs = stringlist_new();
 
 	struct vfs_inode_t **new_inodes = realloc(vfs->inode.data, sizeof(struct vfs_inode_t*) * (vfs->inode.count + 1));
 	if (!new_inodes) {
@@ -210,7 +224,7 @@ static bool vfs_lookup_splitter(const char *path, bool is_full_path, void *vctx)
 	if (inode) {
 		ctx->map_result->flags = (ctx->map_result->flags | inode->set_flags) & ~inode->reset_flags;
 		if (is_full_path) {
-			ctx->map_result->virtual_directory = true;
+			ctx->map_result->inode = inode;
 		}
 		if (inode->target_path) {
 			ctx->map_result->mountpoint = inode;
@@ -299,6 +313,7 @@ void vfs_free(struct vfs_t *vfs) {
 	for (unsigned int i = 0; i < vfs->inode.count; i++) {
 		free(vfs->inode.data[i]->virtual_path);
 		free(vfs->inode.data[i]->target_path);
+		stringlist_free(vfs->inode.data[i]->virtual_subdirs);
 		free(vfs->inode.data[i]);
 	}
 	free(vfs->inode.data);
@@ -324,24 +339,36 @@ static char *vfs_map_path(struct vfs_t *vfs, const struct vfs_lookup_result_t *l
 	}
 
 	size_t virtual_path_length = strlen(virtual_path);
-	if (virtual_path_length < lookup->mountpoint->vlen + 1) {
-		vfs_set_error(vfs, VFS_ILLEGAL_PATH, "vfs_map_path() has received shorter virtual path than mountpoint; something is wrong.");
-		return NULL;
-	}
-	const char *virtual_path_suffix = virtual_path + lookup->mountpoint->vlen + 1;
-	size_t suffix_length = virtual_path_length - lookup->mountpoint->vlen - 1;
-
-	size_t memory_requirement = lookup->mountpoint->tlen + 1 + suffix_length + 1;
-	char *result = malloc(memory_requirement);
-	if (!result) {
-		vfs_set_error(vfs, VFS_OUT_OF_MEMORY, "vfs_map_path() could not allocate memory for mapped path");
+	if (virtual_path_length < lookup->mountpoint->vlen) {
+		vfs_set_error(vfs, VFS_ILLEGAL_PATH, "vfs_map_path() has received shorter virtual path (%s) than mountpoint (%s); something is wrong.", virtual_path, lookup->mountpoint->virtual_path);
 		return NULL;
 	}
 
-	memcpy(result, lookup->mountpoint->target_path, lookup->mountpoint->tlen);
-	result[lookup->mountpoint->tlen] = '/';
-	memcpy(result + lookup->mountpoint->tlen + 1, virtual_path_suffix, suffix_length);
-	result[lookup->mountpoint->tlen + 1 + suffix_length] = 0;
+	char *result = NULL;
+	if (virtual_path_length > lookup->mountpoint->vlen) {
+		const char *virtual_path_suffix = virtual_path + lookup->mountpoint->vlen + 1;
+		size_t suffix_length = virtual_path_length - lookup->mountpoint->vlen - 1;
+
+		size_t memory_requirement = lookup->mountpoint->tlen + 1 + suffix_length + 1;
+		result = malloc(memory_requirement);
+		if (!result) {
+			vfs_set_error(vfs, VFS_OUT_OF_MEMORY, "vfs_map_path() could not allocate memory for mapped path");
+			return NULL;
+		}
+
+		memcpy(result, lookup->mountpoint->target_path, lookup->mountpoint->tlen);
+		result[lookup->mountpoint->tlen] = '/';
+		memcpy(result + lookup->mountpoint->tlen + 1, virtual_path_suffix, suffix_length);
+		result[lookup->mountpoint->tlen + 1 + suffix_length] = 0;
+	} else if (virtual_path_length == lookup->mountpoint->vlen) {
+		size_t memory_requirement = lookup->mountpoint->tlen + 1;
+		result = malloc(memory_requirement);
+		if (!result) {
+			vfs_set_error(vfs, VFS_OUT_OF_MEMORY, "vfs_map_path() could not allocate memory for mapped path");
+			return NULL;
+		}
+		strcpy(result, lookup->mountpoint->target_path);
+	}
 
 	return result;
 }
@@ -379,7 +406,7 @@ static enum vfs_error_t vfs_open_node(struct vfs_t *vfs, const char *path, struc
 		return VFS_INTERNAL_ERROR;
 	}
 
-	handle->virtual_directory = lookup.virtual_directory;
+	handle->inode = lookup.inode;
 	handle->flags = lookup.flags;
 
 	if (lookup.flags & VFS_INODE_FLAG_FILTER_ALL) {
@@ -396,7 +423,7 @@ static enum vfs_error_t vfs_open_node(struct vfs_t *vfs, const char *path, struc
 		}
 	}
 
-	if ((!handle->virtual_directory) && (!lookup.mountpoint)) {
+	if ((!handle->inode) && (!lookup.mountpoint)) {
 		logmsg(LLVL_DEBUG, "vfs_open_node() returning 'no such file or directory' because no mountpoint exists for \"%s\".", handle->virtual_path);
 		vfs_close_handle(handle);
 		return VFS_NO_SUCH_FILE_OR_DIRECTORY;
@@ -452,15 +479,32 @@ enum vfs_error_t vfs_chdir(struct vfs_t *vfs, const char *path) {
 		return result;
 	}
 
-	if (handle->virtual_directory) {
+	if (handle->inode) {
 		/* We always allow chdir to a virtual directory */
 		bool success = vfs_set_cwd(vfs, handle->virtual_path);
 		vfs_close_handle(handle);
 		return success ? VFS_OK : VFS_INTERNAL_ERROR;
 	} else {
-		logmsg(LLVL_CRITICAL, "vfs_chdir() not implemented TODO");
-	}
+		struct stat statbuf;
+		if (stat(handle->mapped_path, &statbuf)) {
+			enum vfs_error_t error_code = vfs_errno_to_vfs_error(errno);
+			logmsg(LLVL_WARN, "vfs_chdir() refused to change directory to mapped %s; stat failed", handle->mapped_path);
+			vfs_close_handle(handle);
+			return error_code;
+		}
 
+		if (!S_ISDIR(statbuf.st_mode)) {
+			logmsg(LLVL_WARN, "vfs_chdir() refused to change directory to mapped %s; not a directory", handle->mapped_path);
+			vfs_close_handle(handle);
+			return VFS_NOT_A_DIRECTORY;
+		}
+
+		if (!vfs_set_cwd(vfs, handle->virtual_path)) {
+			logmsg(LLVL_ERROR, "vfs_chdir() failed to change directory to %s", handle->virtual_path);
+			vfs_close_handle(handle);
+			return VFS_INTERNAL_ERROR;
+		}
+	}
 
 	vfs_close_handle(handle);
 	return VFS_OK;
@@ -477,12 +521,153 @@ enum vfs_error_t vfs_opendir(struct vfs_t *vfs, const char *path, struct vfs_han
 
 	handle->dir.dir = opendir(handle->mapped_path);
 	if (!handle->dir.dir) {
-		vfs_set_error(vfs, VFS_OPENDIR_FAILED, "vfs_opendir() failed to call opendir(3): %s", strerror(errno));
-		vfs_close_handle(handle);
-		return vfs_errno_to_vfs_error(errno);
+		logmsg(LLVL_DEBUG, "vfs_opendir() cannot open %s (%s), but is a virtual directory at %p", handle->mapped_path, strerror(errno), handle->inode);
+
+//		logmsg(LLVL_WARN, "vfs_opendir() got invalid handle type %u", handle->type);
+//		vfs_set_error(vfs, VFS_OPENDIR_FAILED, "vfs_opendir() failed to call opendir(3) on \"%s\": %s", handle->mapped_path, strerror(errno));
+//		vfs_close_handle(handle);
+//		return vfs_errno_to_vfs_error(errno);
 	}
 
 	return VFS_OK;
+}
+
+enum vfs_error_t vfs_open(struct vfs_t *vfs, const char *path, enum vfs_filemode_t mode, struct vfs_handle_t **handle_ptr) {
+	enum vfs_error_t result = vfs_open_node(vfs, path, handle_ptr);
+	if (result != VFS_OK) {
+		return result;
+	}
+
+	struct vfs_handle_t *handle = *handle_ptr;
+	handle->type = FILE_HANDLE;
+
+	struct stat statbuf;
+	int stat_result = stat(handle->mapped_path, &statbuf);
+	if (stat_result == -1) {
+		/* stat failed; this is only okay if we're writing and the stat failed
+		 * because the file did not exist. */
+		if ((errno != ENOENT) || ((mode == FILEMODE_READ) && (errno != ENOENT))) {
+			enum vfs_error_t error_code = vfs_errno_to_vfs_error(errno);
+			logmsg(LLVL_DEBUG, "vfs_open() had error when running stat(): %s", strerror(errno));
+			vfs_close_handle(handle);
+			return error_code;
+		}
+	} else {
+		/* stat successful, then we require that it's actually a file */
+		if (!S_ISREG(statbuf.st_mode)) {
+			/* not a file */
+			logmsg(LLVL_DEBUG, "vfs_open() refusing to open non-file");
+			vfs_close_handle(handle);
+			return VFS_NOT_A_FILE;
+		}
+	}
+
+	if ((handle->flags & VFS_INODE_FLAG_READ_ONLY) && (mode != FILEMODE_READ)) {
+		/* Requesting writing on a readonly file */
+		logmsg(LLVL_DEBUG, "vfs_open() refusing to open file in write mode when flags indicate read-only");
+		vfs_close_handle(handle);
+		return VFS_PERMISSION_DENIED;
+	}
+
+	handle->file.file = fopen(handle->mapped_path, mode_string_mapping[mode]);
+	if (!handle->file.file) {
+		/* e.g., permission denied */
+		enum vfs_error_t error_code = vfs_errno_to_vfs_error(errno);
+		logmsg(LLVL_DEBUG, "vfs_open() got error when calling fopen()");
+		vfs_close_handle(handle);
+		return error_code;
+	}
+	return VFS_OK;
+}
+
+static enum vfs_error_t vfs_stat_virtual_directory(const char *virtual_dirname, struct vfs_dirent_t *vfs_dirent, unsigned int flags) {
+	*vfs_dirent = (struct vfs_dirent_t) {
+		.permissions = (flags & VFS_INODE_FLAG_READ_ONLY) ? 0555 : 0755,
+	};
+	strncpy(vfs_dirent->filename, virtual_dirname, VFS_MAX_FILENAME_LENGTH - 1);
+	vfs_dirent->filename[VFS_MAX_FILENAME_LENGTH - 1] = 0;
+	return VFS_OK;
+}
+
+static enum vfs_error_t vfs_stat_statbuf(const struct stat *statbuf, struct vfs_dirent_t *vfs_dirent, unsigned int flags) {
+	vfs_dirent->eof = false;
+	vfs_dirent->is_file = S_ISREG(statbuf->st_mode);
+	vfs_dirent->uid = statbuf->st_uid;
+	vfs_dirent->gid = statbuf->st_gid;
+	vfs_dirent->filesize = statbuf->st_size;
+	vfs_dirent->permissions = statbuf->st_mode & (S_IRWXU | S_IRWXG | S_IRWXO);
+	vfs_dirent->mtime = statbuf->st_mtim;
+	vfs_dirent->ctime = statbuf->st_ctim;
+	vfs_dirent->atime = statbuf->st_atim;
+	if (flags & VFS_INODE_FLAG_READ_ONLY) {
+		/* Strip write permission flags if read-only handle */
+		vfs_dirent->permissions &= ~(S_IWUSR | S_IWGRP | S_IWOTH);
+	}
+	return VFS_OK;
+}
+
+enum vfs_error_t vfs_stat(struct vfs_t *vfs, const char *path, struct vfs_dirent_t *vfs_dirent) {
+	struct vfs_handle_t *handle;
+	enum vfs_error_t result = vfs_open_node(vfs, path, &handle);
+	if (result != VFS_OK) {
+		return result;
+	}
+
+	if (handle->inode) {
+		/* Virtual directory */
+		enum vfs_error_t error_code = vfs_stat_virtual_directory(const_basename(handle->virtual_path), vfs_dirent, handle->flags);
+		vfs_close_handle(handle);
+		return error_code;
+	}
+
+	/* Mapped directory */
+	errno = 0;
+	struct stat statbuf;
+	int stat_result = stat(handle->mapped_path, &statbuf);
+	if (stat_result == -1) {
+		/* stat failed */
+		enum vfs_error_t error_code = vfs_errno_to_vfs_error(errno);
+		vfs_close_handle(handle);
+		return error_code;
+	}
+
+	strncpy(vfs_dirent->filename, const_basename(handle->virtual_path), VFS_MAX_FILENAME_LENGTH - 1);
+	vfs_dirent->filename[VFS_MAX_FILENAME_LENGTH - 1] = 0;
+	unsigned int flags = handle->flags;
+	vfs_close_handle(handle);
+	return vfs_stat_statbuf(&statbuf, vfs_dirent, flags);
+}
+
+enum vfs_error_t vfs_read(struct vfs_handle_t *handle, void *ptr, size_t *length) {
+	if (handle->type != FILE_HANDLE) {
+		logmsg(LLVL_WARN, "vfs_read() got invalid handle type %u", handle->type);
+		return VFS_INTERNAL_ERROR;
+	}
+
+	errno = 0;
+	*length = fread(ptr, 1, *length, handle->file.file);
+	int fread_errno = errno;
+
+	if (errno) {
+		logmsg(LLVL_ERROR, "vfs_read() had I/O error when reading from file: %s", strerror(fread_errno));
+	}
+	return (fread_errno == 0) ? VFS_OK : VFS_IO_ERROR;
+}
+
+enum vfs_error_t vfs_write(struct vfs_handle_t *handle, const void *ptr, size_t *length) {
+	if (handle->type != FILE_HANDLE) {
+		logmsg(LLVL_WARN, "vfs_write() got invalid handle type %u", handle->type);
+		return VFS_INTERNAL_ERROR;
+	}
+
+	errno = 0;
+	*length = fwrite(ptr, 1, *length, handle->file.file);
+	int fwrite_errno = errno;
+
+	if (errno) {
+		logmsg(LLVL_ERROR, "vfs_write() had I/O error when writing to file: %s", strerror(fwrite_errno));
+	}
+	return (fwrite_errno == 0) ? VFS_OK : VFS_IO_ERROR;
 }
 
 enum vfs_error_t vfs_readdir(struct vfs_handle_t *handle, struct vfs_dirent_t *vfs_dirent) {
@@ -491,9 +676,20 @@ enum vfs_error_t vfs_readdir(struct vfs_handle_t *handle, struct vfs_dirent_t *v
 		return VFS_INTERNAL_ERROR;
 	}
 
-	/* TODO: return internal nodes first */
+	if (!handle->inode && !handle->dir.dir) {
+		logmsg(LLVL_ERROR, "vfs_readdir() has neither inode nor open directory");
+		return VFS_INTERNAL_ERROR;
+	}
 
-	while (true) {
+	if (handle->inode) {
+		if (handle->dir.internal_node_index < handle->inode->virtual_subdirs->count) {
+			const char *virtual_dirname = handle->inode->virtual_subdirs->strings[handle->dir.internal_node_index];
+			handle->dir.internal_node_index++;
+			return vfs_stat_virtual_directory(virtual_dirname, vfs_dirent, handle->flags);
+		}
+	}
+
+	while (handle->dir.dir) {
 		errno = 0;
 		struct dirent *dirent = readdir(handle->dir.dir);
 		if ((dirent == NULL) && (errno != 0)) {
@@ -503,8 +699,12 @@ enum vfs_error_t vfs_readdir(struct vfs_handle_t *handle, struct vfs_dirent_t *v
 		}
 
 		if (dirent == NULL) {
-			vfs_dirent->eof = true;
-			return VFS_OK;
+			break;
+		}
+
+		if (!strcmp(dirent->d_name, ".") || !strcmp(dirent->d_name, "..")) {
+			/* We're omitting the '.' and '..' nodes in this listing */
+			continue;
 		}
 
 		if ((dirent->d_type != DT_REG) && (dirent->d_type != DT_DIR) && (dirent->d_type != DT_LNK)) {
@@ -513,9 +713,12 @@ enum vfs_error_t vfs_readdir(struct vfs_handle_t *handle, struct vfs_dirent_t *v
 			continue;
 		}
 
-		/* TODO: filter names of internal nodes */
+		if (handle->inode && stringlist_contains(handle->inode->virtual_subdirs, dirent->d_name)) {
+			/* Provided by directory listing, but overridden by virtual directory */
+			continue;
+		}
 
-		strncpy(vfs_dirent->filename, dirent->d_name, VFS_MAX_FILENAME_LENGTH);
+		strncpy(vfs_dirent->filename, dirent->d_name, VFS_MAX_FILENAME_LENGTH - 1);
 		vfs_dirent->filename[VFS_MAX_FILENAME_LENGTH - 1] = 0;
 
 		errno = 0;
@@ -534,23 +737,11 @@ enum vfs_error_t vfs_readdir(struct vfs_handle_t *handle, struct vfs_dirent_t *v
 			/* Special file (block device, char device, FIFO, unknown) */
 			continue;
 		}
-
-		vfs_dirent->eof = false;
-		vfs_dirent->is_file = (file_type == S_IFREG);
-		vfs_dirent->uid = statbuf.st_uid;
-		vfs_dirent->gid = statbuf.st_gid;
-		vfs_dirent->filesize = statbuf.st_size;
-		vfs_dirent->permissions = statbuf.st_mode & (S_IRWXU | S_IRWXG | S_IRWXO);
-		if (handle->flags & VFS_INODE_FLAG_READ_ONLY) {
-			/* Strip write permission flags if read-only handle */
-			vfs_dirent->permissions &= ~(S_IWUSR | S_IWGRP | S_IWOTH);
-		}
-		vfs_dirent->mtime = statbuf.st_mtim;
-		vfs_dirent->ctime = statbuf.st_ctim;
-		vfs_dirent->atime = statbuf.st_atim;
-
-		return VFS_OK;
+		return vfs_stat_statbuf(&statbuf, vfs_dirent, handle->flags);
 	}
+
+	vfs_dirent->eof = true;
+	return VFS_OK;
 }
 
 void vfs_close_handle(struct vfs_handle_t *handle) {
@@ -562,6 +753,10 @@ void vfs_close_handle(struct vfs_handle_t *handle) {
 	if (handle->type == DIR_HANDLE) {
 		if (handle->dir.dir) {
 			closedir(handle->dir.dir);
+		}
+	} else if (handle->type == FILE_HANDLE) {
+		if (handle->file.file) {
+			fclose(handle->file.file);
 		}
 	}
 	free(handle);

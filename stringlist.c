@@ -69,6 +69,17 @@ void stringlist_sort(struct stringlist_t *list) {
 	}
 }
 
+bool stringlist_contains(struct stringlist_t *list, const char *string) {
+	if (!list->count) {
+		return false;
+	}
+	if (!list->sorted) {
+		stringlist_sort(list);
+	}
+	void *match = bsearch(&string, list->strings, list->count, sizeof(char*), stringlist_cmp);
+	return match != NULL;
+}
+
 void stringlist_free(struct stringlist_t *list) {
 	for (unsigned int i = 0; i < list->count; i++) {
 		free(list->strings[i]);

@@ -59,3 +59,13 @@ void test_stringlist_sort(void) {
 	test_assert_str_eq(list->strings[1], "foo");
 	stringlist_free(list);
 }
+
+void test_stringlist_contains(void) {
+	struct stringlist_t* list = stringlist_new();
+	test_assert_false(stringlist_contains(list, "foo"));
+	test_assert_false(stringlist_contains(list, "bar"));
+	stringlist_insert(list, "foo");
+	test_assert_true(stringlist_contains(list, "foo"));
+	test_assert_false(stringlist_contains(list, "bar"));
+	stringlist_free(list);
+}

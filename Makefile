@@ -1,7 +1,7 @@
 .PHONY: test pgmopts install vfsshell tests
 
 CFLAGS := -O3 -std=c11 -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=500 -D_DEFAULT_SOURCE -march=native
-CFLAGS += -Wall -Wmissing-prototypes -Wstrict-prototypes -Werror=implicit-function-declaration -Wno-stringop-truncation -Werror=format -Wshadow -Wswitch -pthread
+CFLAGS += -Wall -Wmissing-prototypes -Wstrict-prototypes -Werror=implicit-function-declaration -Wno-stringop-truncation -Werror=format -Wno-stringop-truncation -Wshadow -Wswitch -pthread
 CFLAGS += -DDEBUG -ggdb3 -pie -fPIE -fsanitize=address -fsanitize=undefined -fsanitize=leak
 CFLAGS += -DWITH_SERVER
 

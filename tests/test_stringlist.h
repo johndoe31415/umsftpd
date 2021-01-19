@@ -28,6 +28,7 @@
 void test_stringlist_create_destroy(void);
 void test_stringlist_insert(void);
 void test_stringlist_sort(void);
+void test_stringlist_contains(void);
 /***************  AUTO GENERATED SECTION ENDS   ***************/
 
 #endif

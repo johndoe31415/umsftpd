@@ -32,7 +32,7 @@
 #include <dirent.h>
 #include "stringlist.h"
 
-#define VFS_MAX_ERROR_LENGTH					64
+#define VFS_MAX_ERROR_LENGTH					128
 #define VFS_MAX_FILENAME_LENGTH					256
 
 #define VFS_INODE_FLAG_READ_ONLY				(1 << 0)
@@ -49,33 +49,40 @@ struct vfs_inode_t {
 	char *virtual_path;
 	char *target_path;
 	size_t vlen, tlen;
+	struct stringlist_t *virtual_subdirs;
 };
 
 struct vfs_lookup_result_t {
 	unsigned int flags;
+	struct vfs_inode_t *inode;
 	struct vfs_inode_t *mountpoint;
-	bool virtual_directory;
 };
 
 enum vfs_handle_type_t {
 	FILE_HANDLE,
 	DIR_HANDLE,
-	VIRTUAL_DIR_HANDLE,
+};
+
+enum vfs_filemode_t {
+	FILEMODE_READ,
+	FILEMODE_WRITE,
+	FILEMODE_APPEND,
 };
 
 struct vfs_handle_t {
 	enum vfs_handle_type_t type;
-	bool virtual_directory;
 	char *virtual_path;
 	char *mapped_path;
+	const struct vfs_inode_t *inode;
 	unsigned int flags;
 	union {
 		struct {
 			DIR *dir;
+			unsigned int internal_node_index;
 		} dir;
 		struct {
-			const struct vfs_inode_t *inode;
-		} virtual_dir;
+			FILE *file;
+		} file;
 	};
 };
 
@@ -114,7 +121,10 @@ enum vfs_error_t {
 	VFS_OUT_OF_HANDLES,
 	VFS_PERMISSION_DENIED,
 	VFS_NO_SUCH_FILE_OR_DIRECTORY,
+	VFS_NOT_A_DIRECTORY,
+	VFS_NOT_A_FILE,
 	VFS_INTERNAL_ERROR,
+	VFS_IO_ERROR,
 };
 
 struct vfs_t {
@@ -148,6 +158,10 @@ struct vfs_t *vfs_init(void);
 void vfs_free(struct vfs_t *vfs);
 enum vfs_error_t vfs_chdir(struct vfs_t *vfs, const char *path);
 enum vfs_error_t vfs_opendir(struct vfs_t *vfs, const char *path, struct vfs_handle_t **handle_ptr);
+enum vfs_error_t vfs_open(struct vfs_t *vfs, const char *path, enum vfs_filemode_t mode, struct vfs_handle_t **handle_ptr);
+enum vfs_error_t vfs_stat(struct vfs_t *vfs, const char *path, struct vfs_dirent_t *vfs_dirent);
+enum vfs_error_t vfs_read(struct vfs_handle_t *handle, void *ptr, size_t *length);
+enum vfs_error_t vfs_write(struct vfs_handle_t *handle, const void *ptr, size_t *length);
 enum vfs_error_t vfs_readdir(struct vfs_handle_t *handle, struct vfs_dirent_t *vfs_dirent);
 void vfs_close_handle(struct vfs_handle_t *handle);
 /***************  AUTO GENERATED SECTION ENDS   ***************/

@@ -61,7 +61,11 @@ static void verify_vfs_lookups(struct vfs_t *vfs, const struct vfs_lookup_data_t
 				test_assert_str_eq(result.mountpoint->virtual_path, testcase->expect.result.mountpoint->virtual_path);
 				test_assert_str_eq(result.mountpoint->target_path, testcase->expect.result.mountpoint->target_path);
 			}
-			test_assert_bool_eq(result.virtual_directory, testcase->expect.result.virtual_directory);
+			if (testcase->expect.result.inode) {
+				test_assert(result.inode != NULL);
+				test_assert_str_eq(result.inode->virtual_path, testcase->expect.result.inode->virtual_path);
+				test_assert_str_eq(result.inode->target_path, testcase->expect.result.inode->target_path);
+			}
 		}
 	}
 }
@@ -88,42 +92,42 @@ void test_vfs_lookup(void) {
 			.expect.success = true,
 			.expect.result.flags = VFS_INODE_FLAG_READ_ONLY,
 			.expect.result.mountpoint = NULL,
-			.expect.result.virtual_directory = true,
+			.expect.result.inode = &(struct vfs_inode_t){ .virtual_path = "", .target_path = NULL },
 		},
 		{
 			.input.path = "/pics/foo.jpg",
 			.expect.success = true,
 			.expect.result.flags = VFS_INODE_FLAG_READ_ONLY,
 			.expect.result.mountpoint = &(struct vfs_inode_t){ .virtual_path = "/pics", .target_path = "/home/joe/pics" },
-			.expect.result.virtual_directory = false,
+			.expect.result.inode = NULL,
 		},
 		{
 			.input.path = "/pics/x/y/z.jpg",
 			.expect.success = true,
 			.expect.result.flags = VFS_INODE_FLAG_READ_ONLY,
 			.expect.result.mountpoint = &(struct vfs_inode_t){ .virtual_path = "/pics", .target_path = "/home/joe/pics" },
-			.expect.result.virtual_directory = false,
+			.expect.result.inode = NULL,
 		},
 		{
 			.input.path = "/this",
 			.expect.success = true,
 			.expect.result.flags = VFS_INODE_FLAG_READ_ONLY,
 			.expect.result.mountpoint = NULL,
-			.expect.result.virtual_directory = true,
+			.expect.result.inode = &(struct vfs_inode_t){ .virtual_path = "/this", .target_path = NULL },
 		},
 		{
 			.input.path = "/incoming/foo/blubb.jpg",
 			.expect.success = true,
 			.expect.result.flags = VFS_INODE_FLAG_READ_ONLY | VFS_INODE_FLAG_DISALLOW_UNLINK,
 			.expect.result.mountpoint = &(struct vfs_inode_t){ .virtual_path = "/incoming", .target_path = "/tmp/write" },
-			.expect.result.virtual_directory = false,
+			.expect.result.inode = NULL,
 		},
 		{
 			.input.path = "/this/is/deeply/nested/blah/mookoo/xyz.jpg",
 			.expect.success = true,
 			.expect.result.flags = VFS_INODE_FLAG_READ_ONLY | VFS_INODE_FLAG_DISALLOW_UNLINK | VFS_INODE_FLAG_DISALLOW_CREATE_DIR | VFS_INODE_FLAG_DISALLOW_UNLINK | VFS_INODE_FLAG_ALLOW_SYMLINKS,
 			.expect.result.mountpoint = &(struct vfs_inode_t){ .virtual_path = "/this/is/deeply/nested", .target_path = "/home/joe/nested" },
-			.expect.result.virtual_directory = false,
+			.expect.result.inode = NULL,
 		}
 	};
 	verify_vfs_lookups(vfs, expected_outcome, sizeof(expected_outcome) / sizeof(struct vfs_lookup_data_t));

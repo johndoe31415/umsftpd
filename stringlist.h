@@ -36,6 +36,7 @@ struct stringlist_t {
 struct stringlist_t* stringlist_new(void);
 bool stringlist_insert(struct stringlist_t *list, const char *string);
 void stringlist_sort(struct stringlist_t *list);
+bool stringlist_contains(struct stringlist_t *list, const char *string);
 void stringlist_free(struct stringlist_t *list);
 /***************  AUTO GENERATED SECTION ENDS   ***************/
 

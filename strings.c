@@ -31,7 +31,7 @@
 
 #include "strings.h"
 
-void path_split_mutable(char *path, path_split_callback_t callback, void *vctx) {
+void __attribute__((nonnull (1, 2))) path_split_mutable(char *path, path_split_callback_t callback, void *vctx) {
 	size_t len = strlen(path);
 	for (size_t i = 0; i < len; i++) {
 		bool is_full_path = (i == (len - 1));
@@ -56,14 +56,14 @@ void path_split_mutable(char *path, path_split_callback_t callback, void *vctx) 
 	}
 }
 
-void path_split(const char *path, path_split_callback_t callback, void *vctx) {
+void __attribute__((nonnull (1, 2))) path_split(const char *path, path_split_callback_t callback, void *vctx) {
 	size_t len = strlen(path);
 	char copy[len + 1];
 	strcpy(copy, path);
 	path_split_mutable(copy, callback, vctx);
 }
 
-bool pathcmp(const char *path1, const char *path2) {
+bool __attribute__((nonnull (1, 2))) pathcmp(const char *path1, const char *path2) {
 	int len1, len2;
 	len1 = strlen(path1);
 	len2 = strlen(path2);
@@ -79,19 +79,19 @@ bool pathcmp(const char *path1, const char *path2) {
 	return !strncmp(path1, path2, len1);
 }
 
-void truncate_trailing_slash(char *path) {
+void __attribute__((nonnull (1))) truncate_trailing_slash(char *path) {
 	int len = strlen(path);
 	while (len && (path[len - 1] == '/')) {
 		path[--len] = 0;
 	}
 }
 
-bool is_valid_path(const char *path) {
+bool __attribute__((nonnull (1))) is_valid_path(const char *path) {
 	int len = strlen(path);
 	return (len > 0) && (path[0] == '/') && (path[len - 1] != '/');
 }
 
-bool is_absolute_path(const char *path) {
+bool __attribute__((nonnull (1))) is_absolute_path(const char *path) {
 	return path[0] == '/';
 }
 
@@ -147,7 +147,7 @@ static char *sanitize_absolute_path(const char *path) {
 	return result;
 }
 
-char* sanitize_path(const char *cwd, const char *path) {
+char* __attribute__((nonnull (1, 2))) sanitize_path(const char *cwd, const char *path) {
 	if (!is_absolute_path(path)) {
 		int cwd_len = strlen(cwd);
 		int path_len = strlen(path);
@@ -163,7 +163,7 @@ char* sanitize_path(const char *cwd, const char *path) {
 
 /* Functions only on sanitized paths, i.e, '/foo/./bar' or '/foo/..' will show
  * up as 'hidden'. */
-bool path_contains_hidden(const char *path) {
+bool __attribute__((nonnull (1))) path_contains_hidden(const char *path) {
 	bool seen_slash = true;
 	while (*path) {
 		char next_char = *path;
@@ -180,7 +180,7 @@ bool path_contains_hidden(const char *path) {
 	return false;
 }
 
-static bool path_contains_symlink_callback(const char *path, bool is_full_path, void *vctx) {
+static bool __attribute__((nonnull (1))) path_contains_symlink_callback(const char *path, bool is_full_path, void *vctx) {
 	struct symlink_check_response_t *ctx = (struct symlink_check_response_t*)vctx;
 	struct stat statbuf;
 	if (lstat(path, &statbuf)) {
@@ -200,7 +200,7 @@ static bool path_contains_symlink_callback(const char *path, bool is_full_path, 
 	return (!ctx->file_not_found) && (!ctx->critical_error) && (!ctx->contains_symlink);
 }
 
-struct symlink_check_response_t path_contains_symlink(const char *path) {
+struct symlink_check_response_t __attribute__((nonnull (1))) path_contains_symlink(const char *path) {
 	struct symlink_check_response_t result = {
 		.critical_error = false,
 		.file_not_found = false,
@@ -210,7 +210,7 @@ struct symlink_check_response_t path_contains_symlink(const char *path) {
 	return result;
 }
 
-void strip_crlf(char *string) {
+void __attribute__((nonnull (1))) strip_crlf(char *string) {
 	int len = strlen(string);
 	if (len && (string[len - 1] == '\n')) {
 		string[--len] = 0;
@@ -218,4 +218,9 @@ void strip_crlf(char *string) {
 	if (len && (string[len - 1] == '\r')) {
 		string[--len] = 0;
 	}
+}
+
+const char *const_basename(const char *path) {
+	/* TODO do some plausibilization */
+	return strrchr(path, '/') + 1;
 }

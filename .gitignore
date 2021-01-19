@@ -2,6 +2,7 @@
 __pycache__
 *.o
 vfstest
+vfsshell
 umsftpd
 ssh_host_ed25519_key
 ssh_host_ed25519_key.pub
