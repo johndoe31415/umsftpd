@@ -36,5 +36,7 @@ void test_sha1(void) {
 	test_assert_str_eq(output, "94287082");
 	test_assert_true(rfc6238_generate_at(totp, output, 1111111109));
 	test_assert_str_eq(output, "07081804");
+	test_assert_true(rfc6238_generate_at(totp, output, 96262));
+	test_assert_str_eq(output, "00044814");
 	rfc6238_free(totp);
 }
