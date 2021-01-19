@@ -580,16 +580,15 @@ enum vfs_error_t vfs_open(struct vfs_t *vfs, const char *path, enum vfs_filemode
 	return VFS_OK;
 }
 
-static enum vfs_error_t vfs_stat_virtual_directory(const char *virtual_dirname, struct vfs_dirent_t *vfs_dirent, unsigned int flags) {
+static void vfs_stat_virtual_directory(const char *virtual_dirname, struct vfs_dirent_t *vfs_dirent, unsigned int flags) {
 	*vfs_dirent = (struct vfs_dirent_t) {
 		.permissions = (flags & VFS_INODE_FLAG_READ_ONLY) ? 0555 : 0755,
 	};
 	strncpy(vfs_dirent->filename, virtual_dirname, VFS_MAX_FILENAME_LENGTH - 1);
 	vfs_dirent->filename[VFS_MAX_FILENAME_LENGTH - 1] = 0;
-	return VFS_OK;
 }
 
-static enum vfs_error_t vfs_stat_statbuf(const struct stat *statbuf, struct vfs_dirent_t *vfs_dirent, unsigned int flags) {
+static void vfs_stat_statbuf(const struct stat *statbuf, struct vfs_dirent_t *vfs_dirent, unsigned int flags) {
 	vfs_dirent->eof = false;
 	vfs_dirent->is_file = S_ISREG(statbuf->st_mode);
 	vfs_dirent->uid = statbuf->st_uid;
@@ -603,7 +602,6 @@ static enum vfs_error_t vfs_stat_statbuf(const struct stat *statbuf, struct vfs_
 		/* Strip write permission flags if read-only handle */
 		vfs_dirent->permissions &= ~(S_IWUSR | S_IWGRP | S_IWOTH);
 	}
-	return VFS_OK;
 }
 
 enum vfs_error_t vfs_stat(struct vfs_t *vfs, const char *path, struct vfs_dirent_t *vfs_dirent) {
@@ -615,9 +613,9 @@ enum vfs_error_t vfs_stat(struct vfs_t *vfs, const char *path, struct vfs_dirent
 
 	if (handle->inode) {
 		/* Virtual directory */
-		enum vfs_error_t error_code = vfs_stat_virtual_directory(const_basename(handle->virtual_path), vfs_dirent, handle->flags);
+		vfs_stat_virtual_directory(const_basename(handle->virtual_path), vfs_dirent, handle->flags);
 		vfs_close_handle(handle);
-		return error_code;
+		return VFS_OK;
 	}
 
 	/* Mapped directory */
@@ -633,9 +631,9 @@ enum vfs_error_t vfs_stat(struct vfs_t *vfs, const char *path, struct vfs_dirent
 
 	strncpy(vfs_dirent->filename, const_basename(handle->virtual_path), VFS_MAX_FILENAME_LENGTH - 1);
 	vfs_dirent->filename[VFS_MAX_FILENAME_LENGTH - 1] = 0;
-	unsigned int flags = handle->flags;
+	vfs_stat_statbuf(&statbuf, vfs_dirent, handle->flags);
 	vfs_close_handle(handle);
-	return vfs_stat_statbuf(&statbuf, vfs_dirent, flags);
+	return VFS_OK;
 }
 
 enum vfs_error_t vfs_read(struct vfs_handle_t *handle, void *ptr, size_t *length) {
@@ -685,7 +683,8 @@ enum vfs_error_t vfs_readdir(struct vfs_handle_t *handle, struct vfs_dirent_t *v
 		if (handle->dir.internal_node_index < handle->inode->virtual_subdirs->count) {
 			const char *virtual_dirname = handle->inode->virtual_subdirs->strings[handle->dir.internal_node_index];
 			handle->dir.internal_node_index++;
-			return vfs_stat_virtual_directory(virtual_dirname, vfs_dirent, handle->flags);
+			vfs_stat_virtual_directory(virtual_dirname, vfs_dirent, handle->flags);
+			return VFS_OK;
 		}
 	}
 
@@ -737,7 +736,8 @@ enum vfs_error_t vfs_readdir(struct vfs_handle_t *handle, struct vfs_dirent_t *v
 			/* Special file (block device, char device, FIFO, unknown) */
 			continue;
 		}
-		return vfs_stat_statbuf(&statbuf, vfs_dirent, handle->flags);
+		vfs_stat_statbuf(&statbuf, vfs_dirent, handle->flags);
+		return VFS_OK;
 	}
 
 	vfs_dirent->eof = true;
