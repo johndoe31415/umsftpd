@@ -9,6 +9,7 @@ LDFLAGS += `pkg-config --libs libssh` `pkg-config --libs openssl`
 
 TEST_COMMON_OBJS := testbench.o testmain.o
 TEST_OBJS := \
+	test_passdb \
 	test_rfc4648 \
 	test_rfc6238 \
 	test_stringlist \
@@ -17,6 +18,7 @@ TEST_OBJS := \
 
 all: $(TEST_COMMON_OBJS) $(TEST_OBJS)
 
+test_passdb: $(TEST_COMMON_OBJS) test_passdb_entry.o passdb.o
 test_rfc4648: $(TEST_COMMON_OBJS) test_rfc4648_entry.o rfc4648.o
 test_rfc6238: $(TEST_COMMON_OBJS) test_rfc6238_entry.o rfc6238.o
 test_stringlist: $(TEST_COMMON_OBJS) test_stringlist_entry.o stringlist.o

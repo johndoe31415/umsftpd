@@ -11,6 +11,7 @@ LDFLAGS += `pkg-config --libs libssh` `pkg-config --libs openssl`
 OBJS := \
 	logging.o \
 	main.o \
+	passdb.o \
 	rfc4648.o \
 	rfc6238.o \
 	stringlist.o \
