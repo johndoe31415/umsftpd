@@ -9,12 +9,13 @@ CFLAGS += `pkg-config --cflags libssh` `pkg-config --cflags openssl`
 LDFLAGS += `pkg-config --libs libssh` `pkg-config --libs openssl`
 
 OBJS := \
-	main.o \
 	logging.o \
-	vfs.o \
+	main.o \
+	rfc4648.o \
+	rfc6238.o \
 	stringlist.o \
 	strings.o \
-	rfc6238.o
+	vfs.o
 
 BINARIES := umsftpd vfsshell
 

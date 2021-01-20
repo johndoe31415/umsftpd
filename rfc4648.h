@@ -21,14 +21,15 @@
  *	Johannes Bauer <JohannesBauer@gmx.de>
 **/
 
-#ifndef __TEST_RFC6238_H__
-#define __TEST_RFC6238_H__
+#ifndef __RFC4648_H__
+#define __RFC4648_H__
+
+#include <stdbool.h>
 
 /*************** AUTO GENERATED SECTION FOLLOWS ***************/
-void test_sha1(void);
-void test_sha256(void);
-void test_sha512(void);
-void test_vanilla(void);
+unsigned int rfc4648_base32_size(const char *input_string);
+bool rfc4648_decode_base32hex(void *output, unsigned int bufsize, const char *input_string);
+bool rfc4648_decode_base32(void *output, unsigned int bufsize, const char *input_string);
 /***************  AUTO GENERATED SECTION ENDS   ***************/
 
 #endif

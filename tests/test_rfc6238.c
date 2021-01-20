@@ -36,7 +36,72 @@ void test_sha1(void) {
 	test_assert_str_eq(output, "94287082");
 	test_assert_true(rfc6238_generate_at(totp, output, 1111111109));
 	test_assert_str_eq(output, "07081804");
+	test_assert_true(rfc6238_generate_at(totp, output, 1111111111));
+	test_assert_str_eq(output, "14050471");
+	test_assert_true(rfc6238_generate_at(totp, output, 1234567890));
+	test_assert_str_eq(output, "89005924");
+	test_assert_true(rfc6238_generate_at(totp, output, 2000000000));
+	test_assert_str_eq(output, "69279037");
+	test_assert_true(rfc6238_generate_at(totp, output, 20000000000));
+	test_assert_str_eq(output, "65353130");
 	test_assert_true(rfc6238_generate_at(totp, output, 96262));
 	test_assert_str_eq(output, "00044814");
+	rfc6238_free(totp);
+}
+
+void test_sha256(void) {
+	const uint8_t secret[] = {
+		0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36,
+		0x37, 0x38, 0x39, 0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x30, 0x31, 0x32
+	};
+	char output[16];
+	struct rfc6238_config_t *totp = rfc6238_new(secret, sizeof(secret), RFC6238_DIGEST_SHA256, 30, 8);
+	test_assert_true(rfc6238_generate_at(totp, output, 59));
+	test_assert_str_eq(output, "46119246");
+	test_assert_true(rfc6238_generate_at(totp, output, 1111111109));
+	test_assert_str_eq(output, "68084774");
+	test_assert_true(rfc6238_generate_at(totp, output, 1111111111));
+	test_assert_str_eq(output, "67062674");
+	test_assert_true(rfc6238_generate_at(totp, output, 1234567890));
+	test_assert_str_eq(output, "91819424");
+	test_assert_true(rfc6238_generate_at(totp, output, 2000000000));
+	test_assert_str_eq(output, "90698825");
+	test_assert_true(rfc6238_generate_at(totp, output, 20000000000));
+	test_assert_str_eq(output, "77737706");
+	rfc6238_free(totp);
+}
+
+void test_sha512(void) {
+	const uint8_t secret[] = {
+		0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36,
+		0x37, 0x38, 0x39, 0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x30, 0x31, 0x32,
+		0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38,
+		0x39, 0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x30, 0x31, 0x32, 0x33, 0x34
+	};
+	char output[16];
+	struct rfc6238_config_t *totp = rfc6238_new(secret, sizeof(secret), RFC6238_DIGEST_SHA512, 30, 8);
+	test_assert_true(rfc6238_generate_at(totp, output, 59));
+	test_assert_str_eq(output, "90693936");
+	test_assert_true(rfc6238_generate_at(totp, output, 1111111109));
+	test_assert_str_eq(output, "25091201");
+	test_assert_true(rfc6238_generate_at(totp, output, 1111111111));
+	test_assert_str_eq(output, "99943326");
+	test_assert_true(rfc6238_generate_at(totp, output, 1234567890));
+	test_assert_str_eq(output, "93441116");
+	test_assert_true(rfc6238_generate_at(totp, output, 2000000000));
+	test_assert_str_eq(output, "38618901");
+	test_assert_true(rfc6238_generate_at(totp, output, 20000000000));
+	test_assert_str_eq(output, "47863826");
+	rfc6238_free(totp);
+}
+
+void test_vanilla(void) {
+	const uint8_t secret[] = {
+		0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x30
+	};
+	char output[16];
+	struct rfc6238_config_t *totp = rfc6238_new(secret, sizeof(secret), RFC6238_DIGEST_SHA1, 30, 6);
+	test_assert_true(rfc6238_generate_at(totp, output, 0));
+	test_assert_str_eq(output, "755224");
 	rfc6238_free(totp);
 }
