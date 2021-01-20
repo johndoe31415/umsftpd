@@ -28,7 +28,7 @@
 #include <openssl/kdf.h>
 #include "passdb.h"
 
-typedef bool (*passdb_derivation_fnc_t)(const struct passdb_entry_t *entry, const char *passphrase, uint8_t digest[static PASSDB_PASS_SIZE_BYTES]);
+typedef bool (*passdb_derivation_fnc_t)(const struct passdb_entry_t *entry, const char *passphrase, unsigned int passphrase_length, uint8_t digest[static PASSDB_PASS_SIZE_BYTES]);
 
 static const union passdb_kdf_params_t default_params[] = {
 	[PASSDB_KDF_PBKDF2_SHA256] = {
@@ -46,11 +46,11 @@ static const union passdb_kdf_params_t default_params[] = {
 	},
 };
 
-static bool passdb_derive_pbkdf2_sha256(const struct passdb_entry_t *entry, const char *passphrase, uint8_t digest[static PASSDB_PASS_SIZE_BYTES]) {
-	return PKCS5_PBKDF2_HMAC(passphrase, strlen(passphrase), entry->salt, PASSDB_SALT_SIZE_BYTES, entry->params.pbkdf2.iterations, EVP_sha256(), PASSDB_PASS_SIZE_BYTES, digest);
+static bool passdb_derive_pbkdf2_sha256(const struct passdb_entry_t *entry, const char *passphrase, unsigned int passphrase_length, uint8_t digest[static PASSDB_PASS_SIZE_BYTES]) {
+	return PKCS5_PBKDF2_HMAC(passphrase, passphrase_length, entry->salt, PASSDB_SALT_SIZE_BYTES, entry->params.pbkdf2.iterations, EVP_sha256(), PASSDB_PASS_SIZE_BYTES, digest);
 }
 
-static bool passdb_derive_scrypt(const struct passdb_entry_t *entry, const char *passphrase, uint8_t digest[static PASSDB_PASS_SIZE_BYTES]) {
+static bool passdb_derive_scrypt(const struct passdb_entry_t *entry, const char *passphrase, unsigned int passphrase_length, uint8_t digest[static PASSDB_PASS_SIZE_BYTES]) {
 	EVP_PKEY_CTX *pctx = NULL;
 	bool success = false;
 
@@ -62,7 +62,7 @@ static bool passdb_derive_scrypt(const struct passdb_entry_t *entry, const char 
 		if (EVP_PKEY_derive_init(pctx) <= 0) {
 			break;
 		}
-		if (EVP_PKEY_CTX_set1_pbe_pass(pctx, passphrase, strlen(passphrase)) <= 0) {
+		if (EVP_PKEY_CTX_set1_pbe_pass(pctx, passphrase, passphrase_length) <= 0) {
 			break;
 		}
 		if (EVP_PKEY_CTX_set1_scrypt_salt(pctx, entry->salt, PASSDB_SALT_SIZE_BYTES) <= 0) {
@@ -93,12 +93,12 @@ static bool passdb_derive_scrypt(const struct passdb_entry_t *entry, const char 
 	return success;
 }
 
-static bool passdb_derive(const struct passdb_entry_t *entry, const char *passphrase, uint8_t digest[static PASSDB_PASS_SIZE_BYTES]) {
+static bool passdb_derive(const struct passdb_entry_t *entry, const char *passphrase, unsigned int passphrase_length, uint8_t digest[static PASSDB_PASS_SIZE_BYTES]) {
 	const passdb_derivation_fnc_t derivation_functions[] = {
 		[PASSDB_KDF_PBKDF2_SHA256] = passdb_derive_pbkdf2_sha256,
 		[PASSDB_KDF_SCRYPT] = passdb_derive_scrypt,
 	};
-	return derivation_functions[entry->kdf](entry, passphrase, digest);
+	return derivation_functions[entry->kdf](entry, passphrase, passphrase_length, digest);
 }
 
 bool passdb_create_entry(struct passdb_entry_t *entry, enum passdb_kdf_t kdf, const union passdb_kdf_params_t *params, const char *passphrase) {
@@ -112,7 +112,7 @@ bool passdb_create_entry(struct passdb_entry_t *entry, enum passdb_kdf_t kdf, co
 		/* Failed to generate salt */
 		return false;
 	}
-	return passdb_derive(entry, passphrase, entry->hash);
+	return passdb_derive(entry, passphrase, strlen(passphrase), entry->hash);
 }
 
 void passdb_entry_dump(const struct passdb_entry_t *entry) {
@@ -142,9 +142,25 @@ void passdb_entry_dump(const struct passdb_entry_t *entry) {
 }
 
 bool passdb_validate(const struct passdb_entry_t *entry, const char *passphrase) {
-	uint8_t digest[PASSDB_PASS_SIZE_BYTES];
-	if (!passdb_derive(entry, passphrase, digest)) {
+	size_t passlen = strlen(passphrase);
+	const char *totp_provided;
+	if (passlen >= entry->totp->digits) {
+		totp_provided = passphrase + passlen - entry->totp->digits;
+		passlen -= entry->totp->digits;
+	} else {
+		totp_provided = "";
+	}
+
+	char totp_expected[16];
+	if (!rfc6238_generate_now(entry->totp, totp_expected)) {
 		return false;
 	}
-	return !memcmp(entry->hash, digest, PASSDB_PASS_SIZE_BYTES);
+
+	uint8_t digest[PASSDB_PASS_SIZE_BYTES];
+	if (!passdb_derive(entry, passphrase, passlen, digest)) {
+		return false;
+	}
+	bool digest_correct = !memcmp(entry->hash, digest, PASSDB_PASS_SIZE_BYTES);
+	bool totp_correct = !entry->totp || !strcmp(totp_provided, totp_expected);
+	return digest_correct && totp_correct;
 }

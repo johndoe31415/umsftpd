@@ -30,8 +30,6 @@
 #include <openssl/hmac.h>
 #include "rfc6238.h"
 
-
-
 struct rfc6238_config_t *rfc6238_new(const void *secret, unsigned int secret_length, enum rfc6238_digest_t digest, unsigned int slice_time_seconds, unsigned int digits) {
 	if ((digits < 1) || (digits > 8)) {
 		return NULL;
