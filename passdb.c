@@ -143,17 +143,17 @@ void passdb_entry_dump(const struct passdb_entry_t *entry) {
 
 bool passdb_validate(const struct passdb_entry_t *entry, const char *passphrase) {
 	size_t passlen = strlen(passphrase);
-	const char *totp_provided;
-	if (passlen >= entry->totp->digits) {
-		totp_provided = passphrase + passlen - entry->totp->digits;
-		passlen -= entry->totp->digits;
-	} else {
-		totp_provided = "";
-	}
-
+	const char *totp_provided = "";
 	char totp_expected[16];
-	if (!rfc6238_generate_now(entry->totp, totp_expected)) {
-		return false;
+	if (entry->totp) {
+		if (passlen >= entry->totp->digits) {
+			totp_provided = passphrase + passlen - entry->totp->digits;
+			passlen -= entry->totp->digits;
+		}
+
+		if (!rfc6238_generate_now(entry->totp, totp_expected)) {
+			return false;
+		}
 	}
 
 	uint8_t digest[PASSDB_PASS_SIZE_BYTES];
