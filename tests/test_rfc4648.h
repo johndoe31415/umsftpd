@@ -6,6 +6,7 @@ void test_base32(void);
 void test_base32hex(void);
 void test_base32_illegal_char(void);
 void test_base32_short(void);
+void test_base32_online_encoder(void);
 /***************  AUTO GENERATED SECTION ENDS   ***************/
 
 #endif

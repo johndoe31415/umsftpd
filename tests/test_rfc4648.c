@@ -84,3 +84,12 @@ void test_base32_short(void) {
 	test_assert_true(rfc4648_decode_base32(buffer, 6, "MZXW6YTBOI======"));
 	test_assert_false(rfc4648_decode_base32(buffer, 5, "MZXW6YTBOI======"));
 }
+
+void test_base32_online_encoder(void) {
+	char buffer[32] = { 0 };
+	test_assert_true(rfc4648_decode_base32(buffer, sizeof(buffer), "JJXWQYLONZSXGICCMF2WK4Q"));
+	test_assert_str_eq(buffer, "Johannes Bauer");
+
+	test_assert_true(rfc4648_decode_base32(buffer, sizeof(buffer), "JJXWQYLONZSXGICCMF2WK4Q="));
+	test_assert_str_eq(buffer, "Johannes Bauer");
+}

@@ -29,7 +29,7 @@ test_vfs: $(TEST_COMMON_OBJS) test_vfs_entry.o vfs.o vfsdebug.o strings.o loggin
 	./generate_entry $< $@
 
 tests: all
-	for testname in $(TEST_OBJS); do ./$$testname; done
+	for testname in $(TEST_OBJS); do ./$$testname || exit 1; done
 
 clean:
 	rm -f $(TEST_COMMON_OBJS) $(TEST_OBJS) ../*.o *.o

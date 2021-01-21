@@ -53,7 +53,7 @@ void test_fail_ext(const char *file, int line, const char *fncname, const char *
 	fprintf(stderr, "FAILED %s %s:%d %s: %.80s\n", current_testcase, file, line, fncname, reason);
 	if (failfnc != NULL) {
 		char *extended_reason = failfnc(lhs, rhs);
-		fprintf(stderr, "   %.120s\n", extended_reason);
+		fprintf(stderr, "   %.180s\n", extended_reason);
 		free(extended_reason);
 	}
 	exit(EXIT_FAILURE);

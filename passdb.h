@@ -57,11 +57,15 @@ struct passdb_entry_t {
 	uint8_t salt[PASSDB_SALT_SIZE_BYTES];
 	uint8_t hash[PASSDB_PASS_SIZE_BYTES];
 	struct rfc6238_config_t *totp;
+	unsigned int totp_window_size;
 };
 
 /*************** AUTO GENERATED SECTION FOLLOWS ***************/
 bool passdb_create_entry(struct passdb_entry_t *entry, enum passdb_kdf_t kdf, const union passdb_kdf_params_t *params, const char *passphrase);
 void passdb_entry_dump(const struct passdb_entry_t *entry);
+void passdb_attach_totp(struct passdb_entry_t *entry, struct rfc6238_config_t *totp, unsigned int window_size_seconds);
+bool passdb_validate_totp(const struct passdb_entry_t *entry, const char *totp_provided, time_t timestamp, int offset);
+bool passdb_validate_around(const struct passdb_entry_t *entry, const char *passphrase, time_t timestamp);
 bool passdb_validate(const struct passdb_entry_t *entry, const char *passphrase);
 /***************  AUTO GENERATED SECTION ENDS   ***************/
 

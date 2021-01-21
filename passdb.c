@@ -137,22 +137,38 @@ void passdb_entry_dump(const struct passdb_entry_t *entry) {
 	}
 	printf("\n");
 	if (entry->totp) {
-		printf("TOTP enabled.\n");
+		printf("TOTP enabled; window size +-%d seconds\n", entry->totp->slice_time_seconds * entry->totp_window_size);
 	}
 }
 
-bool passdb_validate(const struct passdb_entry_t *entry, const char *passphrase) {
+void passdb_attach_totp(struct passdb_entry_t *entry, struct rfc6238_config_t *totp, unsigned int window_size_seconds) {
+	unsigned int totp_window_size = (window_size_seconds + totp->slice_time_seconds - 1) / totp->slice_time_seconds;
+	entry->totp = totp;
+	entry->totp_window_size = totp_window_size;
+}
+
+bool passdb_validate_totp(const struct passdb_entry_t *entry, const char *totp_provided, time_t timestamp, int offset) {
+	if (!entry->totp) {
+		return true;
+	}
+
+	time_t effective_timestamp = timestamp + (offset * (int)entry->totp->slice_time_seconds);
+	char totp_expected[12];
+	if (!rfc6238_generate_at(entry->totp, totp_expected, effective_timestamp)) {
+		return false;
+	}
+
+	bool totp_correct = !strcmp(totp_provided, totp_expected);
+	return totp_correct;
+}
+
+bool passdb_validate_around(const struct passdb_entry_t *entry, const char *passphrase, time_t timestamp) {
 	size_t passlen = strlen(passphrase);
 	const char *totp_provided = "";
-	char totp_expected[16];
 	if (entry->totp) {
 		if (passlen >= entry->totp->digits) {
 			totp_provided = passphrase + passlen - entry->totp->digits;
 			passlen -= entry->totp->digits;
-		}
-
-		if (!rfc6238_generate_now(entry->totp, totp_expected)) {
-			return false;
 		}
 	}
 
@@ -161,6 +177,24 @@ bool passdb_validate(const struct passdb_entry_t *entry, const char *passphrase)
 		return false;
 	}
 	bool digest_correct = !memcmp(entry->hash, digest, PASSDB_PASS_SIZE_BYTES);
-	bool totp_correct = !entry->totp || !strcmp(totp_provided, totp_expected);
-	return digest_correct && totp_correct;
+
+	/* Always validate the TOTP to keep impact of timing side channels as low
+	 * as possible */
+	if (passdb_validate_totp(entry, totp_provided, timestamp, 0)) {
+		return digest_correct;
+	}
+	for (int offset = 1; offset <= entry->totp_window_size; offset++) {
+		if (passdb_validate_totp(entry, totp_provided, timestamp, -offset)) {
+			return digest_correct;
+		}
+		if (passdb_validate_totp(entry, totp_provided, timestamp, offset)) {
+			return digest_correct;
+		}
+	}
+
+	return false;
+}
+
+bool passdb_validate(const struct passdb_entry_t *entry, const char *passphrase) {
+	return passdb_validate_around(entry, passphrase, time(NULL));
 }

@@ -1,0 +1,60 @@
+#!/usr/bin/python3
+#  	umsftpd - User-mode SFTP application.
+#  	Copyright (C) 2021-2021 Johannes Bauer
+#
+#  	This file is part of umsftpd.
+#
+#  	umsftpd is free software; you can redistribute it and/or modify
+#  	it under the terms of the GNU General Public License as published by
+#  	the Free Software Foundation; this program is ONLY licensed under
+#  	version 3 of the License, later versions are explicitly excluded.
+#
+#  	umsftpd is distributed in the hope that it will be useful,
+#  	but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  	GNU General Public License for more details.
+#
+#  	You should have received a copy of the GNU General Public License
+#  	along with umsftpd; if not, write to the Free Software
+#  	Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+#
+#  	Johannes Bauer <JohannesBauer@gmx.de>
+
+import os
+import random
+import string
+import cryptography.hazmat.backends
+import cryptography.hazmat.primitives
+import cryptography.hazmat.primitives.kdf.pbkdf2
+
+kdfname = "PASSDB_KDF_PBKDF2_SHA256"
+
+alphabet = string.ascii_lowercase + string.ascii_uppercase + string.digits + "!$%&/()+-_"
+password = ""
+for i in range(random.randint(8, 16)):
+	password += random.choice(alphabet)
+password = password.encode()
+
+if kdfname == "PASSDB_KDF_PBKDF2_SHA256":
+	iterations = random.randint(100, 2000)
+	param_key = "pbkdf2"
+	params = [ ("iterations", str(iterations)) ]
+	salt = os.urandom(16)
+	backend = cryptography.hazmat.backends.default_backend()
+	kdf = cryptography.hazmat.primitives.kdf.pbkdf2.PBKDF2HMAC(algorithm = cryptography.hazmat.primitives.hashes.SHA256(), length = 32, salt = salt, iterations = iterations, backend = backend)
+	hashval = kdf.derive(password)
+	print(hashval)
+else:
+	raise NotImplementedError(kdfname)
+
+def hex_array(data):
+	return ", ".join("0x%02x" % (c) for c in data)
+
+print("/* Passphrase: %s */" % (password.decode()))
+print("struct passdb_entry_t entry = {")
+print("	.kdf = %s," % (kdfname))
+for (param_name, param_value) in params:
+	print("	.params.%s.%s = %s," % (param_key, param_name, param_value))
+	print("	.salt = { %s }," % (hex_array(salt)))
+	print("	.hash = { %s }," % (hex_array(hashval)))
+print("};")

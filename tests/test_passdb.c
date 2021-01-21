@@ -38,3 +38,50 @@ void test_create_srcypt(void) {
 	test_assert_true(passdb_validate(&entry, "foobar"));
 	test_assert_false(passdb_validate(&entry, "foobar2"));
 }
+
+void test_passdb_custom_params_pbkdf2(void) {
+	/* Passphrase: 31AnNyAi6z */
+	struct passdb_entry_t entry = {
+		.kdf = PASSDB_KDF_PBKDF2_SHA256,
+		.params.pbkdf2.iterations = 281,
+		.salt = { 0xed, 0x01, 0xcf, 0xea, 0x2e, 0x2f, 0x3d, 0xd8, 0x30, 0x19, 0x7b, 0xbc, 0x87, 0x78, 0x7b, 0x63 },
+		.hash = { 0x54, 0x22, 0x32, 0x18, 0xca, 0x0e, 0xa8, 0x29, 0x16, 0x5c, 0x81, 0x92, 0x7d, 0x60, 0x4f, 0x22, 0x84, 0xf1, 0x82, 0x49, 0x88, 0xa6, 0xf5, 0x84, 0x60, 0x1a, 0x48, 0x31, 0x8d, 0x40, 0xcd, 0xe1 },
+	};
+	test_assert_true(passdb_validate(&entry, "31AnNyAi6z"));
+	test_assert_false(passdb_validate(&entry, "31AnNyAi6y"));
+	test_assert_false(passdb_validate(&entry, "foobar"));
+}
+
+void test_passdb_totp(void) {
+	/* Passphrase: DDcA4l2j3OVvmtWeLSpX_U01F(yHmBR4/qw) */
+	struct passdb_entry_t entry = {
+		.kdf = PASSDB_KDF_PBKDF2_SHA256,
+		.params.pbkdf2.iterations = 215,
+		.salt = { 0x6a, 0xc2, 0xe2, 0x0d, 0x74, 0x91, 0xdd, 0x2c, 0xae, 0xc8, 0xbe, 0x8a, 0xc4, 0x2c, 0xd7, 0x83 },
+		.hash = { 0xa0, 0x55, 0x13, 0xc2, 0x6e, 0xef, 0x9b, 0x51, 0x02, 0xde, 0x0f, 0x88, 0xed, 0x6f, 0xec, 0xf4, 0x0e, 0x4b, 0x41, 0x16, 0xc6, 0xb6, 0x75, 0xd1, 0x68, 0xcb, 0x9d, 0xbb, 0xb4, 0x94, 0x00, 0x31 },
+	};
+	test_assert_false(passdb_validate(&entry, ""));
+	test_assert_true(passdb_validate(&entry, "DDcA4l2j3OVvmtWeLSpX_U01F(yHmBR4/qw)"));
+
+	const char *secret = "Johannes Bauer";
+	struct rfc6238_config_t *totp = rfc6238_new(secret, strlen(secret), RFC6238_DIGEST_SHA1, 30, 6);
+	passdb_attach_totp(&entry, totp, 0);
+
+	time_t now = 1611267965;	/* Token 350301 ~25 secs left validity */
+	test_assert_false(passdb_validate(&entry, ""));
+	test_assert_false(passdb_validate(&entry, "DDcA4l2j3OVvmtWeLSpX_U01F(yHmBR4/qw)"));
+	test_assert_false(passdb_validate_around(&entry, "DDcA4l2j3OVvmtWeLSpX_U01F(yHmBR4/qw)", now));
+	test_assert_true(passdb_validate_around(&entry, "DDcA4l2j3OVvmtWeLSpX_U01F(yHmBR4/qw)350301", now));
+
+	/* Token is too old or too new */
+	test_assert_false(passdb_validate_around(&entry, "DDcA4l2j3OVvmtWeLSpX_U01F(yHmBR4/qw)350301", now + 27));
+	test_assert_false(passdb_validate_around(&entry, "DDcA4l2j3OVvmtWeLSpX_U01F(yHmBR4/qw)350301", now - 7));
+
+	/* With increased window size, token validates */
+	passdb_attach_totp(&entry, totp, 1);
+	printf("WINDOW\n");
+	test_assert_true(passdb_validate_around(&entry, "DDcA4l2j3OVvmtWeLSpX_U01F(yHmBR4/qw)350301", now + 27));
+//	test_assert_true(passdb_validate_around(&entry, "DDcA4l2j3OVvmtWeLSpX_U01F(yHmBR4/qw)350301", now - 7));
+
+	rfc6238_free(totp);
+}
