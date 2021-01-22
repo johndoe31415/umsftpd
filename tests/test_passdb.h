@@ -28,7 +28,8 @@
 void test_create_pbkdf2(void);
 void test_create_srcypt(void);
 void test_passdb_custom_params_pbkdf2(void);
-void test_passdb_totp(void);
+void test_passdb_totp_pbkdf2(void);
+void test_passdb_totp_scrypt(void);
 /***************  AUTO GENERATED SECTION ENDS   ***************/
 
 #endif

@@ -52,7 +52,7 @@ void test_passdb_custom_params_pbkdf2(void) {
 	test_assert_false(passdb_validate(&entry, "foobar"));
 }
 
-void test_passdb_totp(void) {
+void test_passdb_totp_pbkdf2(void) {
 	/* Passphrase: DDcA4l2j3OVvmtWeLSpX_U01F(yHmBR4/qw) */
 	struct passdb_entry_t entry = {
 		.kdf = PASSDB_KDF_PBKDF2_SHA256,
@@ -81,6 +81,42 @@ void test_passdb_totp(void) {
 	passdb_attach_totp(&entry, totp, 1);
 	test_assert_true(passdb_validate_around(&entry, "DDcA4l2j3OVvmtWeLSpX_U01F(yHmBR4/qw)350301", now + 27));
 	test_assert_true(passdb_validate_around(&entry, "DDcA4l2j3OVvmtWeLSpX_U01F(yHmBR4/qw)350301", now - 7));
+
+	rfc6238_free(totp);
+}
+
+void test_passdb_totp_scrypt(void) {
+	/* Passphrase: WQ2ys-GFJSfws2 */
+	struct passdb_entry_t entry = {
+		.kdf = PASSDB_KDF_SCRYPT,
+		.params.scrypt.N = 2,
+		.params.scrypt.r = 3,
+		.params.scrypt.p = 1,
+		.params.scrypt.maxmem_mib = 128,
+		.salt = { 0x97, 0xfe, 0x61, 0x34, 0xcf, 0x37, 0xb5, 0xb1, 0x18, 0x25, 0x99, 0x37, 0xc0, 0xd7, 0xed, 0x2a },
+		.hash = { 0xe0, 0x65, 0x28, 0x5d, 0x87, 0x05, 0xa3, 0x82, 0xd7, 0x2b, 0xa1, 0x55, 0xc4, 0xe2, 0x1a, 0x0b, 0x84, 0x3e, 0xfe, 0x56, 0x95, 0x79, 0x5e, 0x34, 0x5f, 0x4d, 0x10, 0x93, 0xdd, 0xff, 0x3d, 0x8d },
+	};
+	test_assert_false(passdb_validate(&entry, ""));
+	test_assert_true(passdb_validate(&entry, "WQ2ys-GFJSfws2"));
+
+	const char *secret = "Johannes Bauer";
+	struct rfc6238_config_t *totp = rfc6238_new(secret, strlen(secret), RFC6238_DIGEST_SHA1, 30, 6);
+	passdb_attach_totp(&entry, totp, 0);
+
+	time_t now = 1611267965;	/* Token 350301 ~25 secs left validity */
+	test_assert_false(passdb_validate(&entry, "WQ2ys-GFJSfws2"));
+	test_assert_false(passdb_validate(&entry, "WQ2ys-GFJSfws2"));
+	test_assert_false(passdb_validate_around(&entry, "WQ2ys-GFJSfws2", now));
+	test_assert_true(passdb_validate_around(&entry, "WQ2ys-GFJSfws2350301", now));
+
+	/* Token is too old or too new */
+	test_assert_false(passdb_validate_around(&entry, "WQ2ys-GFJSfws2350301", now + 27));
+	test_assert_false(passdb_validate_around(&entry, "WQ2ys-GFJSfws2350301", now - 7));
+
+	/* With increased window size, token validates */
+	passdb_attach_totp(&entry, totp, 1);
+	test_assert_true(passdb_validate_around(&entry, "WQ2ys-GFJSfws2350301", now + 27));
+	test_assert_true(passdb_validate_around(&entry, "WQ2ys-GFJSfws2350301", now - 7));
 
 	rfc6238_free(totp);
 }
