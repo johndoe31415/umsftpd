@@ -79,9 +79,8 @@ void test_passdb_totp(void) {
 
 	/* With increased window size, token validates */
 	passdb_attach_totp(&entry, totp, 1);
-	printf("WINDOW\n");
 	test_assert_true(passdb_validate_around(&entry, "DDcA4l2j3OVvmtWeLSpX_U01F(yHmBR4/qw)350301", now + 27));
-//	test_assert_true(passdb_validate_around(&entry, "DDcA4l2j3OVvmtWeLSpX_U01F(yHmBR4/qw)350301", now - 7));
+	test_assert_true(passdb_validate_around(&entry, "DDcA4l2j3OVvmtWeLSpX_U01F(yHmBR4/qw)350301", now - 7));
 
 	rfc6238_free(totp);
 }
