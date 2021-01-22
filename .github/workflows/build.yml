@@ -21,7 +21,7 @@ jobs:
           cmake ../libssh
           sudo make install
     - name: Install dependencies
-      run: sudo apt-get install python3-mako
+      run: sudo apt-get install python3-mako libjson-c-dev
     - name: make
       run: make
     - name: make tests

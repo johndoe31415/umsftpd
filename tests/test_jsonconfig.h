@@ -21,15 +21,11 @@
  *	Johannes Bauer <JohannesBauer@gmx.de>
 **/
 
-#ifndef __TEST_RFC4648_H__
-#define __TEST_RFC4648_H__
+#ifndef __TEST_JSONCONFIG_H__
+#define __TEST_JSONCONFIG_H__
 
 /*************** AUTO GENERATED SECTION FOLLOWS ***************/
-void test_base32(void);
-void test_base32hex(void);
-void test_base32_illegal_char(void);
-void test_base32_short(void);
-void test_base32_online_encoder(void);
+void test_jsonconfig_simple(void);
 /***************  AUTO GENERATED SECTION ENDS   ***************/
 
 #endif

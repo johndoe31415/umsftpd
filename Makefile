@@ -5,10 +5,11 @@ CFLAGS += -Wall -Wmissing-prototypes -Wstrict-prototypes -Werror=implicit-functi
 CFLAGS += -DDEBUG -ggdb3 -pie -fPIE -fsanitize=address -fsanitize=undefined -fsanitize=leak
 CFLAGS += -DWITH_SERVER
 
-CFLAGS += `pkg-config --cflags libssh` `pkg-config --cflags openssl`
-LDFLAGS += `pkg-config --libs libssh` `pkg-config --libs openssl`
+CFLAGS += `pkg-config --cflags libssh` `pkg-config --cflags openssl` `pkg-config --cflags json-c`
+LDFLAGS += `pkg-config --libs libssh` `pkg-config --libs openssl` `pkg-config --libs json-c`
 
 OBJS := \
+	jsonconfig.o \
 	logging.o \
 	main.o \
 	passdb.o \

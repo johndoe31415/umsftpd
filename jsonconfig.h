@@ -21,15 +21,25 @@
  *	Johannes Bauer <JohannesBauer@gmx.de>
 **/
 
-#ifndef __TEST_RFC4648_H__
-#define __TEST_RFC4648_H__
+#ifndef __JSONCONFIG_H__
+#define __JSONCONFIG_H__
+
+#include <stdbool.h>
+
+struct json_base_config_t {
+	const char *bind_addr;
+	unsigned int bind_port;
+	const char *server_key_filename;
+	const char *loglevel;
+};
+
+struct json_config_t {
+	struct json_base_config_t base;
+};
 
 /*************** AUTO GENERATED SECTION FOLLOWS ***************/
-void test_base32(void);
-void test_base32hex(void);
-void test_base32_illegal_char(void);
-void test_base32_short(void);
-void test_base32_online_encoder(void);
+struct json_config_t *jsonconfig_parse(const char *filename);
+void jsonconfig_free(struct json_config_t *config);
 /***************  AUTO GENERATED SECTION ENDS   ***************/
 
 #endif

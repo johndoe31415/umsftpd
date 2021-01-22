@@ -1,0 +1,20 @@
+{
+	"base": {
+		"bind_addr":			"127.0.0.1",
+		"bind_port":			12345,
+		"server_key_filename":	"ssh_host_ed25519_key",
+		"loglevel":				"trace"
+	},
+	"auth": {
+		"joe": {
+			"passphrase":	null,
+			"totp":			"FHDUIHFIUDHFIU",
+			"pubkey":		"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICK49/TapKun5/zQbl/mZHqb2kILgExj//Vs3ymBgMas joe@reliant",
+			"vfs":			"default"
+		}
+	},
+	"vfs": {
+		"default": [
+		]
+	}
+}

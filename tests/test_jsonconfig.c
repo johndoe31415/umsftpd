@@ -21,15 +21,12 @@
  *	Johannes Bauer <JohannesBauer@gmx.de>
 **/
 
-#ifndef __TEST_RFC4648_H__
-#define __TEST_RFC4648_H__
+#include <stdio.h>
+#include "testbench.h"
+#include "jsonconfig.h"
+#include "test_jsonconfig.h"
 
-/*************** AUTO GENERATED SECTION FOLLOWS ***************/
-void test_base32(void);
-void test_base32hex(void);
-void test_base32_illegal_char(void);
-void test_base32_short(void);
-void test_base32_online_encoder(void);
-/***************  AUTO GENERATED SECTION ENDS   ***************/
-
-#endif
+void test_jsonconfig_simple(void) {
+	struct json_config_t *config = jsonconfig_parse("../configuration.json");
+	jsonconfig_free(config);
+}
