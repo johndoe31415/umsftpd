@@ -45,7 +45,7 @@
 
 struct vfs_inode_t {
 	struct vfs_inode_t *parent;
-	unsigned int set_flags, reset_flags;
+	unsigned int flags_set, flags_reset;
 	char *virtual_path;
 	char *target_path;
 	size_t vlen, tlen;
@@ -151,7 +151,7 @@ struct vfs_t {
 
 /*************** AUTO GENERATED SECTION FOLLOWS ***************/
 const char *vfs_error_str(enum vfs_error_t error_code);
-bool vfs_add_inode(struct vfs_t *vfs, const char *virtual_path, const char *target_path, unsigned int set_flags, unsigned int reset_flags);
+bool vfs_add_inode(struct vfs_t *vfs, const char *virtual_path, const char *target_path, unsigned int flags_set, unsigned int flags_reset);
 bool vfs_lookup(struct vfs_t *vfs, struct vfs_lookup_result_t *result, const char *path);
 void vfs_freeze_inodes(struct vfs_t *vfs);
 struct vfs_t *vfs_init(void);

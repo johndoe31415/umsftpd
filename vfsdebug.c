@@ -91,11 +91,11 @@ static void vfs_dump_inode_target(FILE *f, const struct vfs_inode_t *inode) {
 	if (inode->target_path) {
 		fprintf(f, " => %s", inode->target_path);
 	}
-	if (inode->set_flags || inode->reset_flags) {
-		fprintf(f, " [set = 0x%x ", inode->set_flags);
-		vfs_dump_flags(f, inode->set_flags);
-		fprintf(f, ", reset = 0x%x ", inode->reset_flags);
-		vfs_dump_flags(f, inode->reset_flags);
+	if (inode->flags_set || inode->flags_reset) {
+		fprintf(f, " [set = 0x%x ", inode->flags_set);
+		vfs_dump_flags(f, inode->flags_set);
+		fprintf(f, ", reset = 0x%x ", inode->flags_reset);
+		vfs_dump_flags(f, inode->flags_reset);
 		fprintf(f, "]");
 	}
 }

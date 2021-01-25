@@ -42,7 +42,7 @@ static const char *mode_string_mapping[] = {
 	[FILEMODE_APPEND] = "a",
 };
 
-static struct vfs_inode_t* vfs_add_single_inode(struct vfs_t *vfs, const char *virtual_path, const char *target_path, unsigned int set_flags, unsigned int reset_flags, struct vfs_inode_t *parent);
+static struct vfs_inode_t* vfs_add_single_inode(struct vfs_t *vfs, const char *virtual_path, const char *target_path, unsigned int flags_set, unsigned int flags_reset, struct vfs_inode_t *parent);
 
 struct vfs_lookup_traversal_t {
 	struct vfs_t *vfs;
@@ -52,7 +52,7 @@ struct vfs_lookup_traversal_t {
 struct vfs_inode_adding_ctx_t {
 	struct vfs_t *vfs;
 	struct vfs_inode_t *previous;
-	unsigned int leaf_set_flags, leaf_reset_flags;
+	unsigned int leaf_flags_set, leaf_flags_reset;
 	const char *leaf_target_path;
 };
 
@@ -129,7 +129,7 @@ static bool vfs_add_inode_splitter(const char *path, bool is_full_path, void *vc
 		if (!is_full_path) {
 			ctx->previous = vfs_add_single_inode(ctx->vfs, path, NULL, 0, 0, ctx->previous);
 		} else {
-			ctx->previous = vfs_add_single_inode(ctx->vfs, path, ctx->leaf_target_path, ctx->leaf_set_flags, ctx->leaf_reset_flags, ctx->previous);
+			ctx->previous = vfs_add_single_inode(ctx->vfs, path, ctx->leaf_target_path, ctx->leaf_flags_set, ctx->leaf_flags_reset, ctx->previous);
 		}
 	} else {
 		ctx->previous = inode;
@@ -137,7 +137,7 @@ static bool vfs_add_inode_splitter(const char *path, bool is_full_path, void *vc
 	return true;
 }
 
-static struct vfs_inode_t* vfs_add_single_inode(struct vfs_t *vfs, const char *virtual_path, const char *target_path, unsigned int set_flags, unsigned int reset_flags, struct vfs_inode_t *parent) {
+static struct vfs_inode_t* vfs_add_single_inode(struct vfs_t *vfs, const char *virtual_path, const char *target_path, unsigned int flags_set, unsigned int flags_reset, struct vfs_inode_t *parent) {
 	char *vpath_copy = strdup(virtual_path);
 	if (!vpath_copy) {
 		vfs_set_error(vfs, VFS_ADD_INODE_OUT_OF_MEMORY, "error dupping virtual path (%s)", strerror(errno));
@@ -167,8 +167,8 @@ static struct vfs_inode_t* vfs_add_single_inode(struct vfs_t *vfs, const char *v
 		stringlist_insert(parent->virtual_subdirs, virt_basename);
 	}
 	new_inode->parent = parent;
-	new_inode->set_flags = set_flags;
-	new_inode->reset_flags = reset_flags;
+	new_inode->flags_set = flags_set;
+	new_inode->flags_reset = flags_reset;
 	new_inode->virtual_path = vpath_copy;
 	new_inode->target_path = tpath_copy;
 	new_inode->vlen = strlen(vpath_copy);
@@ -190,7 +190,7 @@ static struct vfs_inode_t* vfs_add_single_inode(struct vfs_t *vfs, const char *v
 	return new_inode;
 }
 
-bool vfs_add_inode(struct vfs_t *vfs, const char *virtual_path, const char *target_path, unsigned int set_flags, unsigned int reset_flags) {
+bool vfs_add_inode(struct vfs_t *vfs, const char *virtual_path, const char *target_path, unsigned int flags_set, unsigned int flags_reset) {
 	if (!is_absolute_path(virtual_path)) {
 		vfs_set_error(vfs, VFS_ADD_INODE_PARAMETER_ERROR, "virtual path must start with a '/' character");
 		return false;
@@ -209,8 +209,8 @@ bool vfs_add_inode(struct vfs_t *vfs, const char *virtual_path, const char *targ
 	struct vfs_inode_adding_ctx_t ctx = {
 		.vfs = vfs,
 		.previous = NULL,
-		.leaf_set_flags = set_flags,
-		.leaf_reset_flags = reset_flags,
+		.leaf_flags_set = flags_set,
+		.leaf_flags_reset = flags_reset,
 		.leaf_target_path = target_path,
 	};
 	path_split(virtual_path, vfs_add_inode_splitter, &ctx);
@@ -222,7 +222,7 @@ static bool vfs_lookup_splitter(const char *path, bool is_full_path, void *vctx)
 	struct vfs_lookup_traversal_t *ctx = (struct vfs_lookup_traversal_t*)vctx;
 	struct vfs_inode_t *inode = vfs_find_inode(ctx->vfs, path);
 	if (inode) {
-		ctx->map_result->flags = (ctx->map_result->flags | inode->set_flags) & ~inode->reset_flags;
+		ctx->map_result->flags = (ctx->map_result->flags | inode->flags_set) & ~inode->flags_reset;
 		if (is_full_path) {
 			ctx->map_result->inode = inode;
 		}
