@@ -138,6 +138,7 @@ void test_passdb_totp_only(void) {
 	const char *secret = "Johannes Bauer";
 	struct rfc6238_config_t *totp = rfc6238_new(secret, strlen(secret), RFC6238_DIGEST_SHA1, 30, 6);
 	passdb_attach_totp(&entry, totp, 0);
+	printf("%p\n", totp);
 
 	test_assert_false(passdb_validate_around(&entry, "fsdjkiofjdsoifsd", 4378947));
 	test_assert_false(passdb_validate_around(&entry, "", 2389847));

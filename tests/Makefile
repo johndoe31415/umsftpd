@@ -2,7 +2,7 @@
 
 vpath %.c ..
 
-CFLAGS := -std=c11 -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=500 -D_DEFAULT_SOURCE -Wall -Werror -Wmissing-prototypes -Wstrict-prototypes -Werror=implicit-function-declaration -Wno-stringop-truncation -O3 -I.. -g3
+CFLAGS := -std=c11 -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=500 -D_DEFAULT_SOURCE -Wall -Werror -Wmissing-prototypes -Wstrict-prototypes -Werror=implicit-function-declaration -Wno-stringop-truncation -O0 -I.. -g3
 CFLAGS += -pie -fPIE -fsanitize=address -fsanitize=undefined -fsanitize=leak
 CFLAGS += `pkg-config --cflags libssh` `pkg-config --cflags openssl` `pkg-config --cflags json-c`
 LDFLAGS += `pkg-config --libs libssh` `pkg-config --libs openssl` `pkg-config --libs json-c`

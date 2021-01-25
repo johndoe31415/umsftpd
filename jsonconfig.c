@@ -76,6 +76,8 @@ static bool jsonconfig_parse_auth_user(struct json_parse_ctx_t *ctx, const char 
 		return false;
 	}
 
+//	struct passdb_entry_t entry = { 0 };
+
 //	json_object_object_foreach(auth, key, value) {
 //	}
 
