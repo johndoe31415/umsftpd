@@ -30,6 +30,8 @@ void test_create_srcypt(void);
 void test_passdb_custom_params_pbkdf2(void);
 void test_passdb_totp_pbkdf2(void);
 void test_passdb_totp_scrypt(void);
+void test_passdb_no_password(void);
+void test_passdb_totp_only(void);
 /***************  AUTO GENERATED SECTION ENDS   ***************/
 
 #endif

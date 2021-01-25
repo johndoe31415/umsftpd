@@ -31,6 +31,8 @@
 typedef bool (*passdb_derivation_fnc_t)(const struct passdb_entry_t *entry, const char *passphrase, unsigned int passphrase_length, uint8_t digest[static PASSDB_PASS_SIZE_BYTES]);
 
 static const union passdb_kdf_params_t default_params[] = {
+	[PASSDB_KDF_NONE] = {
+	},
 	[PASSDB_KDF_PBKDF2_SHA256] = {
 		.pbkdf2 = {
 			.iterations = 140845,		/* 100ms on Intel Core i7-5930K CPU @ 3.50GHz */
@@ -45,6 +47,10 @@ static const union passdb_kdf_params_t default_params[] = {
 		},
 	},
 };
+
+static bool passdb_derive_none(const struct passdb_entry_t *entry, const char *passphrase, unsigned int passphrase_length, uint8_t digest[static PASSDB_PASS_SIZE_BYTES]) {
+	return true;
+}
 
 static bool passdb_derive_pbkdf2_sha256(const struct passdb_entry_t *entry, const char *passphrase, unsigned int passphrase_length, uint8_t digest[static PASSDB_PASS_SIZE_BYTES]) {
 	return PKCS5_PBKDF2_HMAC(passphrase, passphrase_length, entry->salt, PASSDB_SALT_SIZE_BYTES, entry->params.pbkdf2.iterations, EVP_sha256(), PASSDB_PASS_SIZE_BYTES, digest);
@@ -95,6 +101,7 @@ static bool passdb_derive_scrypt(const struct passdb_entry_t *entry, const char 
 
 static bool passdb_derive(const struct passdb_entry_t *entry, const char *passphrase, unsigned int passphrase_length, uint8_t digest[static PASSDB_PASS_SIZE_BYTES]) {
 	const passdb_derivation_fnc_t derivation_functions[] = {
+		[PASSDB_KDF_NONE] = passdb_derive_none,
 		[PASSDB_KDF_PBKDF2_SHA256] = passdb_derive_pbkdf2_sha256,
 		[PASSDB_KDF_SCRYPT] = passdb_derive_scrypt,
 	};
@@ -117,25 +124,29 @@ bool passdb_create_entry(struct passdb_entry_t *entry, enum passdb_kdf_t kdf, co
 
 void passdb_entry_dump(const struct passdb_entry_t *entry) {
 	switch (entry->kdf) {
+		case PASSDB_KDF_NONE: printf("no password"); break;
 		case PASSDB_KDF_PBKDF2_SHA256: printf("PBKDF2-SHA256"); break;
 		case PASSDB_KDF_SCRYPT: printf("scrypt"); break;
 	}
 	printf("(");
 	switch (entry->kdf) {
+		case PASSDB_KDF_NONE: break;
 		case PASSDB_KDF_PBKDF2_SHA256: printf("iterations %u", entry->params.pbkdf2.iterations); break;
 		case PASSDB_KDF_SCRYPT: printf("N %u, r %u, p %u, maxmem_mib %u", entry->params.scrypt.N, entry->params.scrypt.r, entry->params.scrypt.p, entry->params.scrypt.maxmem_mib); break;
 	}
 	printf(")\n");
-	printf("Salt [%2d]: ", PASSDB_SALT_SIZE_BYTES);
-	for (unsigned int i = 0; i < PASSDB_SALT_SIZE_BYTES; i++) {
-		printf("%02x", entry->salt[i]);
+	if (entry->kdf != PASSDB_KDF_NONE) {
+		printf("Salt [%2d]: ", PASSDB_SALT_SIZE_BYTES);
+		for (unsigned int i = 0; i < PASSDB_SALT_SIZE_BYTES; i++) {
+			printf("%02x", entry->salt[i]);
+		}
+		printf("\n");
+		printf("Hash [%2d]: ", PASSDB_PASS_SIZE_BYTES);
+		for (unsigned int i = 0; i < PASSDB_PASS_SIZE_BYTES; i++) {
+			printf("%02x", entry->hash[i]);
+		}
+		printf("\n");
 	}
-	printf("\n");
-	printf("Hash [%2d]: ", PASSDB_PASS_SIZE_BYTES);
-	for (unsigned int i = 0; i < PASSDB_PASS_SIZE_BYTES; i++) {
-		printf("%02x", entry->hash[i]);
-	}
-	printf("\n");
 	if (entry->totp) {
 		printf("TOTP enabled; window size +-%d seconds\n", entry->totp->slice_time_seconds * entry->totp_window_size);
 	}
@@ -176,7 +187,7 @@ bool passdb_validate_around(const struct passdb_entry_t *entry, const char *pass
 	if (!passdb_derive(entry, passphrase, passlen, digest)) {
 		return false;
 	}
-	bool digest_correct = !memcmp(entry->hash, digest, PASSDB_PASS_SIZE_BYTES);
+	bool digest_correct = (entry->kdf == PASSDB_KDF_NONE) || !memcmp(entry->hash, digest, PASSDB_PASS_SIZE_BYTES);
 
 	/* Always validate the TOTP to keep impact of timing side channels as low
 	 * as possible */

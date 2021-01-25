@@ -120,3 +120,30 @@ void test_passdb_totp_scrypt(void) {
 
 	rfc6238_free(totp);
 }
+
+void test_passdb_no_password(void) {
+	struct passdb_entry_t entry = {
+		.kdf = PASSDB_KDF_NONE,
+	};
+
+	test_assert_true(passdb_validate_around(&entry, "fsdjkiofjdsoifsd", 4378947));
+	test_assert_true(passdb_validate_around(&entry, "", 2389847));
+	test_assert_true(passdb_validate_around(&entry, "UJOFIDJSAOIJFOIJ39839", 0));
+}
+
+void test_passdb_totp_only(void) {
+	struct passdb_entry_t entry = {
+		.kdf = PASSDB_KDF_NONE,
+	};
+	const char *secret = "Johannes Bauer";
+	struct rfc6238_config_t *totp = rfc6238_new(secret, strlen(secret), RFC6238_DIGEST_SHA1, 30, 6);
+	passdb_attach_totp(&entry, totp, 0);
+
+	test_assert_false(passdb_validate_around(&entry, "fsdjkiofjdsoifsd", 4378947));
+	test_assert_false(passdb_validate_around(&entry, "", 2389847));
+	test_assert_false(passdb_validate_around(&entry, "UJOFIDJSAOIJFOIJ39839", 0));
+
+	time_t now = 1611267965;	/* Token 350301 ~25 secs left validity */
+	test_assert_true(passdb_validate_around(&entry, "WQ2ys-GFJSfws2350301", now));
+	test_assert_true(passdb_validate_around(&entry, "350301", now));
+}

@@ -9,17 +9,6 @@
 		"joe": {
 			"auth": [
 				{
-					"comment": "TOTP only",
-					"type": "password",
-					"passphrase":	null,
-					"totp": {
-						"secret":		"FHDUIHFIUDHFIU",
-						"digest":		"sha256",
-						"time_slice":	30,
-						"digits":		6
-					}
-				},
-				{
 					"comment": "passphrase only",
 					"type": "password",
 					"passphrase": {
@@ -32,6 +21,40 @@
 						"salt": "2e6edcb38084499c2221d0e7c8755fa1",
 						"hash": "7f13e2bf2a169fc23f1ab51c8e52591f138deaf422f81e99139cfe40e4a8e9b1"
 					}
+				},
+				{
+					"comment": "TOTP only",
+					"type": "password",
+					"totp": {
+						"secret":		"FHDUIHFIUDHFIU",
+						"digest":		"sha256",
+						"time_slice":	30,
+						"digits":		6
+					}
+				},
+				{
+					"comment": "passphrase and TOTP",
+					"type": "password",
+					"passphrase": {
+						"kdf":	"scrypt",
+						"params": {
+							"N":	1024,
+							"r":	8,
+							"p":	1
+						},
+						"salt": "2e6edcb38084499c2221d0e7c8755fa1",
+						"hash": "7f13e2bf2a169fc23f1ab51c8e52591f138deaf422f81e99139cfe40e4a8e9b1"
+					},
+					"totp": {
+						"secret":		"FHDUIHFIUDHFIU",
+						"digest":		"sha256",
+						"time_slice":	30,
+						"digits":		6
+					}
+				},
+				{
+					"comment": "no authentication whatsoever",
+					"type": "no-password"
 				},
 				{
 					"type": "pubkey",
